@@ -1,15 +1,15 @@
-test_pid_src = files('test_pid.c')
-test_filters_src = files('test_filters.c')
+if get_option('build_tests')
+  test_exe = executable(
+    'test_fpc',
+    [
+      'test_main.c',
+      'test_harness.c',
+      'test_pid.c',
+      'test_filters.c',
+    ],
+    dependencies: [fpc_dep],
+    include_directories: inc,
+  )
 
-test_exe_pid = executable('test_pid',
-        test_pid_src,
-        include_directories : inc,
-        link_with : lib)
-
-test_exe_filters = executable('test_filters',
-        test_filters_src,
-        include_directories : inc,
-        link_with : lib)
-
-test('pid_controller', test_exe_pid, protocol : 'tap')
-test('filters', test_exe_filters, protocol : 'tap')
+  test('fixedpoint-control unit tests', test_exe, protocol: 'tap')
+endif

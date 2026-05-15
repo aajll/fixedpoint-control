@@ -55,7 +55,9 @@ install_headers(
   subdir: 'fixedpoint-control',
 )
 
-subdir('tests')
+if get_option('build_tests')
+  subdir('tests')
+endif
 
 pkg = import('pkgconfig')
 pkg.generate(

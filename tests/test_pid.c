@@ -1,43 +1,10 @@
-#include <assert.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include "../include/fpc_config.h"
 #include "../include/fpc_pid.h"
-
-typedef void (*test_fn)(void);
-
-static const char *current_test_name = NULL;
-static unsigned int current_test_index = 0U;
-
-static void
-test_assert_impl(int condition, const char *expr, const char *file, int line)
-{
-    if (condition) {
-        return;
-    }
-
-    fprintf(stderr, "not ok %u - %s\n", current_test_index, current_test_name);
-    fprintf(stderr, "# Assertion failed: %s\n", expr);
-    fprintf(stderr, "# Location: %s:%d\n", file, line);
-    fflush(stderr);
-    exit(EXIT_FAILURE);
-}
-
-#undef assert
-#define assert(expr) test_assert_impl((expr) != 0, #expr, __FILE__, __LINE__)
-
-static void
-run_test(const char *name, test_fn fn, unsigned int *index)
-{
-    current_test_name = name;
-    current_test_index = *index;
-    printf("# %s\n", name);
-    fn();
-    printf("ok %u - %s\n", *index, name);
-    *index += 1U;
-}
+#include "test_harness.h"
 
 static struct fpc_pid_config
 test_config(void)
@@ -57,84 +24,79 @@ test_config(void)
     return cfg;
 }
 
-static void
-test_pool_init_required(void)
+TEST_CASE(test_pool_init_required)
 {
     struct fpc_pid *ctx = NULL;
     struct fpc_pid_config cfg = test_config();
 
-    assert(fpc_pid_init(&ctx, &cfg) == FPC_STATUS_NOT_INITIALIZED);
-    assert(ctx == NULL);
+    TEST_ASSERT(fpc_pid_init(&ctx, &cfg) == FPC_STATUS_NOT_INITIALIZED);
+    TEST_ASSERT(ctx == NULL);
 }
 
-static void
-test_init_and_get_config(void)
+TEST_CASE(test_init_and_get_config)
 {
     struct fpc_pid *ctx = NULL;
     struct fpc_pid_config cfg = test_config();
     struct fpc_pid_config copy;
 
-    assert(fpc_pid_pool_init() == FPC_STATUS_OK);
-    assert(fpc_pid_init(&ctx, &cfg) == FPC_STATUS_OK);
-    assert(ctx != NULL);
-    assert(fpc_pid_get_config(ctx, &copy) == FPC_STATUS_OK);
-    assert(copy.kp == cfg.kp);
-    assert(copy.ki == cfg.ki);
-    assert(copy.kd == cfg.kd);
-    assert(copy.dt == cfg.dt);
-    assert(copy.out_min == cfg.out_min);
-    assert(copy.out_max == cfg.out_max);
-    assert(copy.integral_min == cfg.integral_min);
-    assert(copy.integral_max == cfg.integral_max);
-    assert(copy.d_filter_alpha == cfg.d_filter_alpha);
-    assert(fpc_pid_deinit(ctx) == FPC_STATUS_OK);
+    TEST_ASSERT(fpc_pid_pool_init() == FPC_STATUS_OK);
+    TEST_ASSERT(fpc_pid_init(&ctx, &cfg) == FPC_STATUS_OK);
+    TEST_ASSERT(ctx != NULL);
+    TEST_ASSERT(fpc_pid_get_config(ctx, &copy) == FPC_STATUS_OK);
+    TEST_ASSERT(copy.kp == cfg.kp);
+    TEST_ASSERT(copy.ki == cfg.ki);
+    TEST_ASSERT(copy.kd == cfg.kd);
+    TEST_ASSERT(copy.dt == cfg.dt);
+    TEST_ASSERT(copy.out_min == cfg.out_min);
+    TEST_ASSERT(copy.out_max == cfg.out_max);
+    TEST_ASSERT(copy.integral_min == cfg.integral_min);
+    TEST_ASSERT(copy.integral_max == cfg.integral_max);
+    TEST_ASSERT(copy.d_filter_alpha == cfg.d_filter_alpha);
+    TEST_ASSERT(fpc_pid_deinit(ctx) == FPC_STATUS_OK);
 }
 
-static void
-test_invalid_config_rejected(void)
+TEST_CASE(test_invalid_config_rejected)
 {
     struct fpc_pid *ctx = NULL;
     struct fpc_pid_config cfg = test_config();
 
-    assert(fpc_pid_init(NULL, &cfg) == FPC_STATUS_NULL_PTR);
-    assert(fpc_pid_init(&ctx, NULL) == FPC_STATUS_INVALID_PARAM);
+    TEST_ASSERT(fpc_pid_init(NULL, &cfg) == FPC_STATUS_NULL_PTR);
+    TEST_ASSERT(fpc_pid_init(&ctx, NULL) == FPC_STATUS_INVALID_PARAM);
 
     cfg.dt = 0;
-    assert(fpc_pid_init(&ctx, &cfg) == FPC_STATUS_INVALID_PARAM);
+    TEST_ASSERT(fpc_pid_init(&ctx, &cfg) == FPC_STATUS_INVALID_PARAM);
 
     cfg = test_config();
     cfg.out_min = 10;
     cfg.out_max = 0;
-    assert(fpc_pid_init(&ctx, &cfg) == FPC_STATUS_INVALID_PARAM);
+    TEST_ASSERT(fpc_pid_init(&ctx, &cfg) == FPC_STATUS_INVALID_PARAM);
 
     cfg = test_config();
     cfg.integral_min = 10;
     cfg.integral_max = 0;
-    assert(fpc_pid_init(&ctx, &cfg) == FPC_STATUS_INVALID_PARAM);
+    TEST_ASSERT(fpc_pid_init(&ctx, &cfg) == FPC_STATUS_INVALID_PARAM);
 
     cfg = test_config();
     cfg.d_filter_alpha = 65537U;
-    assert(fpc_pid_init(&ctx, &cfg) == FPC_STATUS_INVALID_PARAM);
+    TEST_ASSERT(fpc_pid_init(&ctx, &cfg) == FPC_STATUS_INVALID_PARAM);
 }
 
-static void
-test_saturation_reporting(void)
+TEST_CASE(test_saturation_reporting)
 {
     struct fpc_pid *ctx = NULL;
     struct fpc_pid_config cfg = test_config();
     int32_t output = 0;
 
-    assert(fpc_pid_pool_init() == FPC_STATUS_OK);
-    assert(fpc_pid_init(&ctx, &cfg) == FPC_STATUS_OK);
-    assert(fpc_pid_compute(ctx, 10000, 0, &output) == FPC_STATUS_SATURATED);
-    assert(output == 100);
-    assert(fpc_pid_compute(ctx, -10000, 0, &output) == FPC_STATUS_SATURATED);
-    assert(output == -100);
-    assert(fpc_pid_deinit(ctx) == FPC_STATUS_OK);
+    TEST_ASSERT(fpc_pid_pool_init() == FPC_STATUS_OK);
+    TEST_ASSERT(fpc_pid_init(&ctx, &cfg) == FPC_STATUS_OK);
+    TEST_ASSERT(fpc_pid_compute(ctx, 10000, 0, &output) == FPC_STATUS_SATURATED);
+    TEST_ASSERT(output == 100);
+    TEST_ASSERT(fpc_pid_compute(ctx, -10000, 0, &output) == FPC_STATUS_SATURATED);
+    TEST_ASSERT(output == -100);
+    TEST_ASSERT(fpc_pid_deinit(ctx) == FPC_STATUS_OK);
 }
 
-static void
-test_state_retrieval(void)
+TEST_CASE(test_state_retrieval)
 {
     struct fpc_pid *ctx = NULL;
     struct fpc_pid_config cfg = test_config();
@@ -146,20 +108,19 @@ test_state_retrieval(void)
     cfg.integral_min = -1000;
     cfg.integral_max = 1000;
 
-    assert(fpc_pid_pool_init() == FPC_STATUS_OK);
-    assert(fpc_pid_init(&ctx, &cfg) == FPC_STATUS_OK);
-    assert(fpc_pid_compute(ctx, 1000, 500, &output) == FPC_STATUS_OK);
-    assert(fpc_pid_get_state(ctx, &state) == FPC_STATUS_OK);
-    assert(state.integral > 0);
-    assert(state.prev_error == 500);
-    assert(state.filtered_derivative == 100);
-    assert(state.last_output == output);
-    assert(state.mode == FPC_PID_MODE_AUTO);
-    assert(fpc_pid_deinit(ctx) == FPC_STATUS_OK);
+    TEST_ASSERT(fpc_pid_pool_init() == FPC_STATUS_OK);
+    TEST_ASSERT(fpc_pid_init(&ctx, &cfg) == FPC_STATUS_OK);
+    TEST_ASSERT(fpc_pid_compute(ctx, 1000, 500, &output) == FPC_STATUS_OK);
+    TEST_ASSERT(fpc_pid_get_state(ctx, &state) == FPC_STATUS_OK);
+    TEST_ASSERT(state.integral > 0);
+    TEST_ASSERT(state.prev_error == 500);
+    TEST_ASSERT(state.filtered_derivative == 100);
+    TEST_ASSERT(state.last_output == output);
+    TEST_ASSERT(state.mode == FPC_PID_MODE_AUTO);
+    TEST_ASSERT(fpc_pid_deinit(ctx) == FPC_STATUS_OK);
 }
 
-static void
-test_derivative_filtering(void)
+TEST_CASE(test_derivative_filtering)
 {
     struct fpc_pid *ctx = NULL;
     struct fpc_pid_config cfg = test_config();
@@ -175,41 +136,39 @@ test_derivative_filtering(void)
     cfg.integral_max = 1000;
     cfg.d_filter_alpha = 32768U;
 
-    assert(fpc_pid_pool_init() == FPC_STATUS_OK);
-    assert(fpc_pid_init(&ctx, &cfg) == FPC_STATUS_OK);
-    assert(fpc_pid_compute(ctx, 1000, 0, &output) == FPC_STATUS_OK);
-    assert(output == 500);
-    assert(fpc_pid_get_state(ctx, &state) == FPC_STATUS_OK);
-    assert(state.filtered_derivative == 500);
-    assert(fpc_pid_compute(ctx, 1000, 0, &output) == FPC_STATUS_OK);
-    assert(output == 250);
-    assert(fpc_pid_get_state(ctx, &state) == FPC_STATUS_OK);
-    assert(state.filtered_derivative == 250);
-    assert(fpc_pid_deinit(ctx) == FPC_STATUS_OK);
+    TEST_ASSERT(fpc_pid_pool_init() == FPC_STATUS_OK);
+    TEST_ASSERT(fpc_pid_init(&ctx, &cfg) == FPC_STATUS_OK);
+    TEST_ASSERT(fpc_pid_compute(ctx, 1000, 0, &output) == FPC_STATUS_OK);
+    TEST_ASSERT(output == 500);
+    TEST_ASSERT(fpc_pid_get_state(ctx, &state) == FPC_STATUS_OK);
+    TEST_ASSERT(state.filtered_derivative == 500);
+    TEST_ASSERT(fpc_pid_compute(ctx, 1000, 0, &output) == FPC_STATUS_OK);
+    TEST_ASSERT(output == 250);
+    TEST_ASSERT(fpc_pid_get_state(ctx, &state) == FPC_STATUS_OK);
+    TEST_ASSERT(state.filtered_derivative == 250);
+    TEST_ASSERT(fpc_pid_deinit(ctx) == FPC_STATUS_OK);
 }
 
-static void
-test_reset_clears_runtime_state(void)
+TEST_CASE(test_reset_clears_runtime_state)
 {
     struct fpc_pid *ctx = NULL;
     struct fpc_pid_config cfg = test_config();
     struct fpc_pid_state state;
     int32_t output = 0;
 
-    assert(fpc_pid_pool_init() == FPC_STATUS_OK);
-    assert(fpc_pid_init(&ctx, &cfg) == FPC_STATUS_OK);
-    assert(fpc_pid_compute(ctx, 1000, 0, &output) == FPC_STATUS_SATURATED);
-    assert(fpc_pid_reset(ctx) == FPC_STATUS_OK);
-    assert(fpc_pid_get_state(ctx, &state) == FPC_STATUS_OK);
-    assert(state.integral == 0);
-    assert(state.prev_error == 0);
-    assert(state.filtered_derivative == 0);
-    assert(state.last_output == 0);
-    assert(fpc_pid_deinit(ctx) == FPC_STATUS_OK);
+    TEST_ASSERT(fpc_pid_pool_init() == FPC_STATUS_OK);
+    TEST_ASSERT(fpc_pid_init(&ctx, &cfg) == FPC_STATUS_OK);
+    TEST_ASSERT(fpc_pid_compute(ctx, 1000, 0, &output) == FPC_STATUS_SATURATED);
+    TEST_ASSERT(fpc_pid_reset(ctx) == FPC_STATUS_OK);
+    TEST_ASSERT(fpc_pid_get_state(ctx, &state) == FPC_STATUS_OK);
+    TEST_ASSERT(state.integral == 0);
+    TEST_ASSERT(state.prev_error == 0);
+    TEST_ASSERT(state.filtered_derivative == 0);
+    TEST_ASSERT(state.last_output == 0);
+    TEST_ASSERT(fpc_pid_deinit(ctx) == FPC_STATUS_OK);
 }
 
-static void
-test_set_config_clamps_state(void)
+TEST_CASE(test_set_config_clamps_state)
 {
     struct fpc_pid *ctx = NULL;
     struct fpc_pid_config cfg = test_config();
@@ -222,39 +181,37 @@ test_set_config_clamps_state(void)
     tighter_cfg.integral_min = -5;
     tighter_cfg.integral_max = 5;
 
-    assert(fpc_pid_pool_init() == FPC_STATUS_OK);
-    assert(fpc_pid_init(&ctx, &cfg) == FPC_STATUS_OK);
-    assert(fpc_pid_compute(ctx, 1000, 0, &output) == FPC_STATUS_SATURATED);
-    assert(fpc_pid_set_config(ctx, &tighter_cfg) == FPC_STATUS_SATURATED);
-    assert(fpc_pid_get_state(ctx, &state) == FPC_STATUS_OK);
-    assert(state.integral <= 5);
-    assert(state.last_output <= 10);
-    assert(fpc_pid_deinit(ctx) == FPC_STATUS_OK);
+    TEST_ASSERT(fpc_pid_pool_init() == FPC_STATUS_OK);
+    TEST_ASSERT(fpc_pid_init(&ctx, &cfg) == FPC_STATUS_OK);
+    TEST_ASSERT(fpc_pid_compute(ctx, 1000, 0, &output) == FPC_STATUS_SATURATED);
+    TEST_ASSERT(fpc_pid_set_config(ctx, &tighter_cfg) == FPC_STATUS_SATURATED);
+    TEST_ASSERT(fpc_pid_get_state(ctx, &state) == FPC_STATUS_OK);
+    TEST_ASSERT(state.integral <= 5);
+    TEST_ASSERT(state.last_output <= 10);
+    TEST_ASSERT(fpc_pid_deinit(ctx) == FPC_STATUS_OK);
 }
 
-static void
-test_pool_exhaustion(void)
+TEST_CASE(test_pool_exhaustion)
 {
     struct fpc_pid *ctx[FPC_MAX_INSTANCES] = {0};
     struct fpc_pid *extra = NULL;
     struct fpc_pid_config cfg = test_config();
     uint16_t i;
 
-    assert(fpc_pid_pool_init() == FPC_STATUS_OK);
+    TEST_ASSERT(fpc_pid_pool_init() == FPC_STATUS_OK);
     for (i = 0U; i < FPC_MAX_INSTANCES; ++i) {
-        assert(fpc_pid_init(&ctx[i], &cfg) == FPC_STATUS_OK);
+        TEST_ASSERT(fpc_pid_init(&ctx[i], &cfg) == FPC_STATUS_OK);
     }
 
-    assert(fpc_pid_init(&extra, &cfg) == FPC_STATUS_POOL_FULL);
-    assert(extra == NULL);
+    TEST_ASSERT(fpc_pid_init(&extra, &cfg) == FPC_STATUS_POOL_FULL);
+    TEST_ASSERT(extra == NULL);
 
     for (i = 0U; i < FPC_MAX_INSTANCES; ++i) {
-        assert(fpc_pid_deinit(ctx[i]) == FPC_STATUS_OK);
+        TEST_ASSERT(fpc_pid_deinit(ctx[i]) == FPC_STATUS_OK);
     }
 }
 
-static void
-test_manual_mode_and_bumpless_return(void)
+TEST_CASE(test_manual_mode_and_bumpless_return)
 {
     struct fpc_pid *ctx = NULL;
     struct fpc_pid_config cfg = test_config();
@@ -268,41 +225,39 @@ test_manual_mode_and_bumpless_return(void)
     cfg.ki = 0;
     cfg.kd = 0;
 
-    assert(fpc_pid_pool_init() == FPC_STATUS_OK);
-    assert(fpc_pid_init(&ctx, &cfg) == FPC_STATUS_OK);
-    assert(fpc_pid_set_mode(ctx, FPC_PID_MODE_MANUAL, 300) == FPC_STATUS_OK);
-    assert(fpc_pid_compute(ctx, 1000, 900, &output) == FPC_STATUS_OK);
-    assert(output == 300);
-    assert(fpc_pid_get_state(ctx, &state) == FPC_STATUS_OK);
-    assert(state.mode == FPC_PID_MODE_MANUAL);
-    assert(state.prev_error == 100);
+    TEST_ASSERT(fpc_pid_pool_init() == FPC_STATUS_OK);
+    TEST_ASSERT(fpc_pid_init(&ctx, &cfg) == FPC_STATUS_OK);
+    TEST_ASSERT(fpc_pid_set_mode(ctx, FPC_PID_MODE_MANUAL, 300) == FPC_STATUS_OK);
+    TEST_ASSERT(fpc_pid_compute(ctx, 1000, 900, &output) == FPC_STATUS_OK);
+    TEST_ASSERT(output == 300);
+    TEST_ASSERT(fpc_pid_get_state(ctx, &state) == FPC_STATUS_OK);
+    TEST_ASSERT(state.mode == FPC_PID_MODE_MANUAL);
+    TEST_ASSERT(state.prev_error == 100);
 
-    assert(fpc_pid_set_mode(ctx, FPC_PID_MODE_AUTO, 0) == FPC_STATUS_OK);
-    assert(fpc_pid_get_state(ctx, &state) == FPC_STATUS_OK);
-    assert(state.mode == FPC_PID_MODE_AUTO);
-    assert(state.integral == 200);
-    assert(fpc_pid_compute(ctx, 1000, 900, &output) == FPC_STATUS_OK);
-    assert(output == 300);
-    assert(fpc_pid_deinit(ctx) == FPC_STATUS_OK);
+    TEST_ASSERT(fpc_pid_set_mode(ctx, FPC_PID_MODE_AUTO, 0) == FPC_STATUS_OK);
+    TEST_ASSERT(fpc_pid_get_state(ctx, &state) == FPC_STATUS_OK);
+    TEST_ASSERT(state.mode == FPC_PID_MODE_AUTO);
+    TEST_ASSERT(state.integral == 200);
+    TEST_ASSERT(fpc_pid_compute(ctx, 1000, 900, &output) == FPC_STATUS_OK);
+    TEST_ASSERT(output == 300);
+    TEST_ASSERT(fpc_pid_deinit(ctx) == FPC_STATUS_OK);
 }
 
-static void
-test_manual_mode_clamps_output(void)
+TEST_CASE(test_manual_mode_clamps_output)
 {
     struct fpc_pid *ctx = NULL;
     struct fpc_pid_config cfg = test_config();
     int32_t output = 0;
 
-    assert(fpc_pid_pool_init() == FPC_STATUS_OK);
-    assert(fpc_pid_init(&ctx, &cfg) == FPC_STATUS_OK);
-    assert(fpc_pid_set_mode(ctx, FPC_PID_MODE_MANUAL, 1000) == FPC_STATUS_SATURATED);
-    assert(fpc_pid_compute(ctx, 0, 0, &output) == FPC_STATUS_OK);
-    assert(output == 100);
-    assert(fpc_pid_deinit(ctx) == FPC_STATUS_OK);
+    TEST_ASSERT(fpc_pid_pool_init() == FPC_STATUS_OK);
+    TEST_ASSERT(fpc_pid_init(&ctx, &cfg) == FPC_STATUS_OK);
+    TEST_ASSERT(fpc_pid_set_mode(ctx, FPC_PID_MODE_MANUAL, 1000) == FPC_STATUS_SATURATED);
+    TEST_ASSERT(fpc_pid_compute(ctx, 0, 0, &output) == FPC_STATUS_OK);
+    TEST_ASSERT(output == 100);
+    TEST_ASSERT(fpc_pid_deinit(ctx) == FPC_STATUS_OK);
 }
 
-static void
-test_null_and_invalid_runtime_calls(void)
+TEST_CASE(test_null_and_invalid_runtime_calls)
 {
     struct fpc_pid *ctx = NULL;
     struct fpc_pid_config cfg = test_config();
@@ -310,59 +265,50 @@ test_null_and_invalid_runtime_calls(void)
     int32_t output = 0;
     struct fpc_pid_state state;
 
-    assert(fpc_pid_pool_init() == FPC_STATUS_OK);
-    assert(fpc_pid_reset(NULL) == FPC_STATUS_NULL_PTR);
-    assert(fpc_pid_get_config(NULL, &copy) == FPC_STATUS_NULL_PTR);
-    assert(fpc_pid_get_config(ctx, NULL) == FPC_STATUS_NULL_PTR);
-    assert(fpc_pid_set_mode(NULL, FPC_PID_MODE_MANUAL, 0) == FPC_STATUS_NULL_PTR);
-    assert(fpc_pid_get_state(NULL, &state) == FPC_STATUS_NULL_PTR);
-    assert(fpc_pid_get_state(ctx, NULL) == FPC_STATUS_NULL_PTR);
-    assert(fpc_pid_compute(NULL, 0, 0, &output) == FPC_STATUS_NULL_PTR);
-    assert(fpc_pid_compute(ctx, 0, 0, NULL) == FPC_STATUS_NULL_PTR);
+    TEST_ASSERT(fpc_pid_pool_init() == FPC_STATUS_OK);
+    TEST_ASSERT(fpc_pid_reset(NULL) == FPC_STATUS_NULL_PTR);
+    TEST_ASSERT(fpc_pid_get_config(NULL, &copy) == FPC_STATUS_NULL_PTR);
+    TEST_ASSERT(fpc_pid_get_config(ctx, NULL) == FPC_STATUS_NULL_PTR);
+    TEST_ASSERT(fpc_pid_set_mode(NULL, FPC_PID_MODE_MANUAL, 0) == FPC_STATUS_NULL_PTR);
+    TEST_ASSERT(fpc_pid_get_state(NULL, &state) == FPC_STATUS_NULL_PTR);
+    TEST_ASSERT(fpc_pid_get_state(ctx, NULL) == FPC_STATUS_NULL_PTR);
+    TEST_ASSERT(fpc_pid_compute(NULL, 0, 0, &output) == FPC_STATUS_NULL_PTR);
+    TEST_ASSERT(fpc_pid_compute(ctx, 0, 0, NULL) == FPC_STATUS_NULL_PTR);
 
-    assert(fpc_pid_init(&ctx, &cfg) == FPC_STATUS_OK);
-    assert(fpc_pid_deinit(ctx) == FPC_STATUS_OK);
-    assert(fpc_pid_compute(ctx, 1000, 0, &output) == FPC_STATUS_NOT_INITIALIZED);
-    assert(fpc_pid_reset(ctx) == FPC_STATUS_NOT_INITIALIZED);
-    assert(fpc_pid_set_mode(ctx, FPC_PID_MODE_AUTO, 0) == FPC_STATUS_NOT_INITIALIZED);
+    TEST_ASSERT(fpc_pid_init(&ctx, &cfg) == FPC_STATUS_OK);
+    TEST_ASSERT(fpc_pid_deinit(ctx) == FPC_STATUS_OK);
+    TEST_ASSERT(fpc_pid_compute(ctx, 1000, 0, &output) == FPC_STATUS_NOT_INITIALIZED);
+    TEST_ASSERT(fpc_pid_reset(ctx) == FPC_STATUS_NOT_INITIALIZED);
+    TEST_ASSERT(fpc_pid_set_mode(ctx, FPC_PID_MODE_AUTO, 0) == FPC_STATUS_NOT_INITIALIZED);
 }
 
-static void
-test_overflow_detection(void)
+TEST_CASE(test_overflow_detection)
 {
     struct fpc_pid *ctx = NULL;
     struct fpc_pid_config cfg = test_config();
     int32_t output = 0;
 
-    assert(fpc_pid_pool_init() == FPC_STATUS_OK);
-    assert(fpc_pid_init(&ctx, &cfg) == FPC_STATUS_OK);
-    assert(fpc_pid_compute(ctx, INT32_MAX, INT32_MIN, &output) == FPC_STATUS_OVERFLOW);
-    assert(output == 0);
-    assert(fpc_pid_deinit(ctx) == FPC_STATUS_OK);
+    TEST_ASSERT(fpc_pid_pool_init() == FPC_STATUS_OK);
+    TEST_ASSERT(fpc_pid_init(&ctx, &cfg) == FPC_STATUS_OK);
+    TEST_ASSERT(fpc_pid_compute(ctx, INT32_MAX, INT32_MIN, &output) == FPC_STATUS_OVERFLOW);
+    TEST_ASSERT(output == 0);
+    TEST_ASSERT(fpc_pid_deinit(ctx) == FPC_STATUS_OK);
 }
 
-int
-main(void)
+void
+run_pid_tests(void)
 {
-    unsigned int test_index = 1U;
-
-    setvbuf(stdout, NULL, _IONBF, 0);
-    puts("TAP version 13");
-    puts("1..13");
-
-    run_test("pool_init_required", test_pool_init_required, &test_index);
-    run_test("init_and_get_config", test_init_and_get_config, &test_index);
-    run_test("invalid_config_rejected", test_invalid_config_rejected, &test_index);
-    run_test("saturation_reporting", test_saturation_reporting, &test_index);
-    run_test("state_retrieval", test_state_retrieval, &test_index);
-    run_test("derivative_filtering", test_derivative_filtering, &test_index);
-    run_test("reset_clears_runtime_state", test_reset_clears_runtime_state, &test_index);
-    run_test("set_config_clamps_state", test_set_config_clamps_state, &test_index);
-    run_test("pool_exhaustion", test_pool_exhaustion, &test_index);
-    run_test("manual_mode_and_bumpless_return", test_manual_mode_and_bumpless_return, &test_index);
-    run_test("manual_mode_clamps_output", test_manual_mode_clamps_output, &test_index);
-    run_test("null_and_invalid_runtime_calls", test_null_and_invalid_runtime_calls, &test_index);
-    run_test("overflow_detection", test_overflow_detection, &test_index);
-
-    return 0;
+    run_test(test_pool_init_required, "pool_init_required");
+    run_test(test_init_and_get_config, "init_and_get_config");
+    run_test(test_invalid_config_rejected, "invalid_config_rejected");
+    run_test(test_saturation_reporting, "saturation_reporting");
+    run_test(test_state_retrieval, "state_retrieval");
+    run_test(test_derivative_filtering, "derivative_filtering");
+    run_test(test_reset_clears_runtime_state, "reset_clears_runtime_state");
+    run_test(test_set_config_clamps_state, "set_config_clamps_state");
+    run_test(test_pool_exhaustion, "pool_exhaustion");
+    run_test(test_manual_mode_and_bumpless_return, "manual_mode_and_bumpless_return");
+    run_test(test_manual_mode_clamps_output, "manual_mode_clamps_output");
+    run_test(test_null_and_invalid_runtime_calls, "null_and_invalid_runtime_calls");
+    run_test(test_overflow_detection, "overflow_detection");
 }

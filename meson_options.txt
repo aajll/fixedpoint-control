@@ -1,15 +1,24 @@
+# === Build personality ========================================================
+# By default we disable tests. These can be enabled by passing
+# -Dbuild_tests=true to meson.
+option(
+  'build_tests',
+  type: 'boolean',
+  value: false,
+  description: 'Build and run unit tests',
+)
+
+# === Pool geometry =============================================================
 option(
   'fpc_max_instances',
-  type : 'integer',
-  value : 8,
-  min : 1,
-  description : 'Maximum number of pooled PID/FIR/biquad instances'
+  type: 'integer',
+  value: 8,
+  description: 'Maximum number of instances per internal pool',
 )
 
 option(
   'fpc_pool_item_size',
-  type : 'integer',
-  value : 528,
-  min : 1,
-  description : 'Size in bytes of each pooled object slot'
+  type: 'integer',
+  value: 528,
+  description: 'Size in bytes of each pool slot',
 )
