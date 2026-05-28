@@ -25,13 +25,13 @@
 /* ------------------------------------------------------------------ */
 
 #if defined(FPC_CONF_PATH)
-    /* Explicit path supplied via -DFPC_CONF_PATH=\"...\" */
-    #include FPC_CONF_PATH
+/* Explicit path supplied via -DFPC_CONF_PATH=\"...\" */
+#include FPC_CONF_PATH
 
 #elif defined(__has_include)
-    #if __has_include("fpc_conf.h")
-        #include "fpc_conf.h"
-    #endif
+#if __has_include("fpc_conf.h")
+#include "fpc_conf.h"
+#endif
 #endif
 
 /* ------------------------------------------------------------------ */
@@ -40,18 +40,18 @@
 
 /** Maximum number of simultaneously active PID / FIR / biquad instances. */
 #ifndef FPC_MAX_INSTANCES
-#define FPC_MAX_INSTANCES       8
+#define FPC_MAX_INSTANCES (8U)
 #endif
 
 /** Size in bytes of each pool slot (must be >= largest controller struct
  *  and a multiple of `_Alignof(max_align_t)`, typically 16). */
 #ifndef FPC_POOL_ITEM_SIZE
-#define FPC_POOL_ITEM_SIZE      528
+#define FPC_POOL_ITEM_SIZE (528U)
 #endif
 
 /** Maximum FIR filter order (number of taps). */
 #ifndef FPC_FILTER_MAX_ORDER
-#define FPC_FILTER_MAX_ORDER    64U
+#define FPC_FILTER_MAX_ORDER (64U)
 #endif
 
 /* ------------------------------------------------------------------ */
@@ -59,11 +59,11 @@
 /* ------------------------------------------------------------------ */
 
 #ifndef POOL_MAX_SLOTS
-#define POOL_MAX_SLOTS  FPC_MAX_INSTANCES
+#define POOL_MAX_SLOTS FPC_MAX_INSTANCES
 #endif
 
 #ifndef POOL_ITEM_SIZE
-#define POOL_ITEM_SIZE  FPC_POOL_ITEM_SIZE
+#define POOL_ITEM_SIZE FPC_POOL_ITEM_SIZE
 #endif
 
 #endif /* FPC_CONFIG_H_ */

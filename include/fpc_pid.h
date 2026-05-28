@@ -6,8 +6,8 @@
 #ifndef FPC_PID_H_
 #define FPC_PID_H_
 
-#include <stdint.h>
 #include "fpc_status.h"
+#include <stdint.h>
 
 struct fpc_pid;
 
@@ -28,8 +28,8 @@ struct fpc_pid;
  *       to fpc_pid_compute().
  */
 enum fpc_pid_mode {
-    FPC_PID_MODE_AUTO = 0,
-    FPC_PID_MODE_MANUAL = 1
+        FPC_PID_MODE_AUTO = 0,
+        FPC_PID_MODE_MANUAL = 1
 };
 
 /**
@@ -46,11 +46,13 @@ enum fpc_pid_mode {
  * terms as integer ratios over the configured sample time \f$ \Delta t \f$:
  *
  * \f[
- * u[k] = \frac{K_p}{\Delta t} \cdot e[k] + \frac{K_i}{\Delta t} \cdot \sum_{i=0}^{k} e[i]
+ * u[k] = \frac{K_p}{\Delta t} \cdot e[k] + \frac{K_i}{\Delta t} \cdot
+ * \sum_{i=0}^{k} e[i]
  *        + \frac{K_d}{\Delta t} \cdot (e[k] - e[k-1])
  * \f]
  *
- * The derivative term uses exponential smoothing with coefficient \f$ \alpha \f$:
+ * The derivative term uses exponential smoothing with coefficient \f$ \alpha
+ * \f$:
  *
  * \f[
  * D[k] = D[k-1] + \frac{\alpha}{65536} \cdot \left(D_{raw}[k] - D[k-1]\right)
@@ -72,15 +74,16 @@ enum fpc_pid_mode {
  *   - d_filter_alpha <= 65536 (valid smoothing coefficient)
  */
 struct fpc_pid_config {
-    int32_t kp;                 /**< Proportional gain numerator divided by dt at runtime */
-    int32_t ki;                 /**< Integral gain numerator divided by dt at runtime */
-    int32_t kd;                 /**< Derivative gain numerator divided by dt at runtime */
-    int32_t dt;                 /**< Sample time in ticks (must be > 0) */
-    int32_t out_min;            /**< Minimum output clamp (inclusive) */
-    int32_t out_max;            /**< Maximum output clamp (inclusive) */
-    int32_t integral_min;       /**< Minimum integral term (inclusive) */
-    int32_t integral_max;       /**< Maximum integral term (inclusive) */
-    uint32_t d_filter_alpha;    /**< Derivative smoothing coefficient (Q16.16, 0-65536) */
+        int32_t kp; /**< Proportional gain numerator divided by dt at runtime */
+        int32_t ki; /**< Integral gain numerator divided by dt at runtime */
+        int32_t kd; /**< Derivative gain numerator divided by dt at runtime */
+        int32_t dt; /**< Sample time in ticks (must be > 0) */
+        int32_t out_min;         /**< Minimum output clamp (inclusive) */
+        int32_t out_max;         /**< Maximum output clamp (inclusive) */
+        int32_t integral_min;    /**< Minimum integral term (inclusive) */
+        int32_t integral_max;    /**< Maximum integral term (inclusive) */
+        uint32_t d_filter_alpha; /**< Derivative smoothing coefficient (Q16.16,
+                                    0-65536) */
 };
 
 /**
@@ -96,11 +99,11 @@ struct fpc_pid_config {
  *       implementation; they are not Q16.16-encoded values.
  */
 struct fpc_pid_state {
-    int32_t integral;               /**< Current integral term */
-    int32_t prev_error;             /**< Previous error value e[k-1] */
-    int32_t filtered_derivative;    /**< Smoothed derivative term D[k] */
-    int32_t last_output;            /**< Last computed output u[k] */
-    enum fpc_pid_mode mode;         /**< Current operating mode */
+        int32_t integral;            /**< Current integral term */
+        int32_t prev_error;          /**< Previous error value e[k-1] */
+        int32_t filtered_derivative; /**< Smoothed derivative term D[k] */
+        int32_t last_output;         /**< Last computed output u[k] */
+        enum fpc_pid_mode mode;      /**< Current operating mode */
 };
 
 /**
@@ -136,7 +139,7 @@ enum fpc_status fpc_pid_pool_init(void);
  *       after return do not affect the controller.
  */
 enum fpc_status fpc_pid_init(struct fpc_pid **ctx,
-                              const struct fpc_pid_config *cfg);
+                             const struct fpc_pid_config *cfg);
 
 /**
  * @brief Deinitialize a PID controller instance and return it to the pool.
@@ -147,7 +150,8 @@ enum fpc_status fpc_pid_init(struct fpc_pid **ctx,
  *
  * @retval FPC_STATUS_OK on success.
  * @retval FPC_STATUS_NULL_PTR if ctx is NULL.
- * @retval FPC_STATUS_NOT_INITIALIZED if ctx is not a valid initialized controller.
+ * @retval FPC_STATUS_NOT_INITIALIZED if ctx is not a valid initialized
+ * controller.
  *
  * @pre fpc_pid_init() must have been called with ctx.
  * @post ctx is no longer valid and cannot be used after return.
@@ -164,7 +168,8 @@ enum fpc_status fpc_pid_deinit(struct fpc_pid *ctx);
  *
  * @retval FPC_STATUS_OK on success.
  * @retval FPC_STATUS_NULL_PTR if ctx is NULL.
- * @retval FPC_STATUS_NOT_INITIALIZED if ctx is not a valid initialized controller.
+ * @retval FPC_STATUS_NOT_INITIALIZED if ctx is not a valid initialized
+ * controller.
  *
  * @pre fpc_pid_init() must have been called with ctx.
  * @post The integral term, previous error, and filtered derivative are zeroed.
@@ -183,13 +188,16 @@ enum fpc_status fpc_pid_reset(struct fpc_pid *ctx);
  *
  * @retval FPC_STATUS_OK on success.
  * @retval FPC_STATUS_NULL_PTR if ctx is NULL.
- * @retval FPC_STATUS_INVALID_PARAM if cfg is NULL or contains invalid parameters.
- * @retval FPC_STATUS_NOT_INITIALIZED if ctx is not a valid initialized controller.
+ * @retval FPC_STATUS_INVALID_PARAM if cfg is NULL or contains invalid
+ * parameters.
+ * @retval FPC_STATUS_NOT_INITIALIZED if ctx is not a valid initialized
+ * controller.
  * @retval FPC_STATUS_SATURATED if internal state was clamped.
  *
  * @pre fpc_pid_init() must have been called with ctx.
  * @post All configuration parameters are updated atomically.
- * @post Integral term is clamped to integral_min..integral_max if out of bounds.
+ * @post Integral term is clamped to integral_min..integral_max if out of
+ * bounds.
  * @post last_output is clamped to out_min..out_max if out of bounds.
  * @note The controller does not reset on configuration change; state persists.
  */
@@ -206,7 +214,8 @@ enum fpc_status fpc_pid_set_config(struct fpc_pid *ctx,
  *
  * @retval FPC_STATUS_OK on success.
  * @retval FPC_STATUS_NULL_PTR if ctx or cfg is NULL.
- * @retval FPC_STATUS_NOT_INITIALIZED if ctx is not a valid initialized controller.
+ * @retval FPC_STATUS_NOT_INITIALIZED if ctx is not a valid initialized
+ * controller.
  *
  * @pre fpc_pid_init() must have been called with ctx.
  * @post *cfg contains a snapshot of the current configuration.
@@ -227,19 +236,21 @@ enum fpc_status fpc_pid_get_config(const struct fpc_pid *ctx,
  * @retval FPC_STATUS_OK on success.
  * @retval FPC_STATUS_NULL_PTR if ctx is NULL.
  * @retval FPC_STATUS_INVALID_PARAM if mode is invalid.
- * @retval FPC_STATUS_NOT_INITIALIZED if ctx is not a valid initialized controller.
- * @retval FPC_STATUS_SATURATED if manual_output was clamped to out_min..out_max.
+ * @retval FPC_STATUS_NOT_INITIALIZED if ctx is not a valid initialized
+ * controller.
+ * @retval FPC_STATUS_SATURATED if manual_output was clamped to
+ * out_min..out_max.
  *
  * @pre fpc_pid_init() must have been called with ctx.
  * @post When switching from MANUAL to AUTO, the integral term is rebalanced
  *       to maintain output continuity (anti-windup).
- * @post When switching to MANUAL, last_output is set to the clamped manual_output value.
+ * @post When switching to MANUAL, last_output is set to the clamped
+ * manual_output value.
  * @post When switching to AUTO, the integral term is adjusted to account for
  *       the proportional and derivative contributions to the current output.
  */
-enum fpc_status fpc_pid_set_mode(struct fpc_pid *ctx,
-                                  enum fpc_pid_mode mode,
-                                  int32_t manual_output);
+enum fpc_status fpc_pid_set_mode(struct fpc_pid *ctx, enum fpc_pid_mode mode,
+                                 int32_t manual_output);
 
 /**
  * @brief Compute the PID output for a given setpoint and measurement.
@@ -253,8 +264,10 @@ enum fpc_status fpc_pid_set_mode(struct fpc_pid *ctx,
  *
  * @retval FPC_STATUS_OK on success with no clamping.
  * @retval FPC_STATUS_NULL_PTR if ctx or output is NULL.
- * @retval FPC_STATUS_NOT_INITIALIZED if ctx is not a valid initialized controller.
- * @retval FPC_STATUS_OVERFLOW if an intermediate value cannot be represented as int32_t.
+ * @retval FPC_STATUS_NOT_INITIALIZED if ctx is not a valid initialized
+ * controller.
+ * @retval FPC_STATUS_OVERFLOW if an intermediate value cannot be represented as
+ * int32_t.
  * @retval FPC_STATUS_SATURATED if output or integral term was clamped.
  *
  * @pre fpc_pid_init() must have been called with ctx.
@@ -262,15 +275,14 @@ enum fpc_status fpc_pid_set_mode(struct fpc_pid *ctx,
  *       computed PID value clamped to out_min..out_max.
  * @post In AUTO mode with no overflow: computes full PID with proportional,
  *       integral, and derivative terms and updates the controller state.
- * @post In MANUAL mode: returns last_output without computation, updates prev_error, and clears the filtered derivative state.
+ * @post In MANUAL mode: returns last_output without computation, updates
+ * prev_error, and clears the filtered derivative state.
  * @note Error is computed as: error = setpoint - measurement
  * @note If overflow is detected, the controller holds the previous output and
  *       returns FPC_STATUS_OVERFLOW.
  */
-enum fpc_status fpc_pid_compute(struct fpc_pid *ctx,
-                                 int32_t setpoint,
-                                 int32_t measurement,
-                                 int32_t *output);
+enum fpc_status fpc_pid_compute(struct fpc_pid *ctx, int32_t setpoint,
+                                int32_t measurement, int32_t *output);
 
 /**
  * @brief Retrieve the current runtime state of a PID controller.
@@ -282,13 +294,15 @@ enum fpc_status fpc_pid_compute(struct fpc_pid *ctx,
  *
  * @retval FPC_STATUS_OK on success.
  * @retval FPC_STATUS_NULL_PTR if ctx or state is NULL.
- * @retval FPC_STATUS_NOT_INITIALIZED if ctx is not a valid initialized controller.
+ * @retval FPC_STATUS_NOT_INITIALIZED if ctx is not a valid initialized
+ * controller.
  *
  * @pre fpc_pid_init() must have been called with ctx.
  * @post *state contains a snapshot of the current internal state.
- * @note This function is useful for diagnostics, logging, and mode transition logic.
+ * @note This function is useful for diagnostics, logging, and mode transition
+ * logic.
  */
 enum fpc_status fpc_pid_get_state(const struct fpc_pid *ctx,
-                                   struct fpc_pid_state *state);
+                                  struct fpc_pid_state *state);
 
 #endif /* FPC_PID_H_ */

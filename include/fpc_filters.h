@@ -13,9 +13,9 @@
 #ifndef FPC_FILTERS_H_
 #define FPC_FILTERS_H_
 
-#include <stdint.h>
 #include "fpc_config.h"
 #include "fpc_status.h"
+#include <stdint.h>
 
 struct fpc_fir;
 struct fpc_biquad;
@@ -55,8 +55,10 @@ struct fpc_biquad;
  * @note Coefficients are stored in Q16.16 fixed-point format.
  */
 struct fpc_fir_config {
-    uint16_t order;         /**< Filter order (number of taps, 1 to FPC_FILTER_MAX_ORDER) */
-    const int32_t *coeffs;  /**< Pointer to array of Q16.16 filter coefficients */
+        uint16_t order; /**< Filter order (number of taps, 1 to
+                           FPC_FILTER_MAX_ORDER) */
+        const int32_t
+            *coeffs; /**< Pointer to array of Q16.16 filter coefficients */
 };
 
 /**
@@ -84,14 +86,15 @@ struct fpc_fir_config {
  *
  * @note The implementation stores delayed input and output samples explicitly
  *       as `x1`, `x2`, `y1`, and `y2`.
- * @note Coefficients are stored in Q16.16 fixed-point format (1 sign bit, 15 integer bits, 16 fractional bits).
+ * @note Coefficients are stored in Q16.16 fixed-point format (1 sign bit, 15
+ * integer bits, 16 fractional bits).
  */
 struct fpc_biquad_config {
-    int32_t b0;     /**< Feedforward coefficient for x[k] (Q16.16) */
-    int32_t b1;     /**< Feedforward coefficient for x[k-1] (Q16.16) */
-    int32_t b2;     /**< Feedforward coefficient for x[k-2] (Q16.16) */
-    int32_t a1;     /**< Feedback coefficient for y[k-1] (Q16.16) */
-    int32_t a2;     /**< Feedback coefficient for y[k-2] (Q16.16) */
+        int32_t b0; /**< Feedforward coefficient for x[k] (Q16.16) */
+        int32_t b1; /**< Feedforward coefficient for x[k-1] (Q16.16) */
+        int32_t b2; /**< Feedforward coefficient for x[k-2] (Q16.16) */
+        int32_t a1; /**< Feedback coefficient for y[k-1] (Q16.16) */
+        int32_t a2; /**< Feedback coefficient for y[k-2] (Q16.16) */
 };
 
 /**
@@ -100,7 +103,8 @@ struct fpc_biquad_config {
  * @return enum fpc_status Status code indicating success or failure.
  *
  * @pre No pre-initialization required.
- * @post The pool allocator is initialized and ready for filter instance creation.
+ * @post The pool allocator is initialized and ready for filter instance
+ * creation.
  * @note Must be called before any filter instances can be created.
  */
 enum fpc_status fpc_filter_pool_init(void);
@@ -115,19 +119,20 @@ enum fpc_status fpc_filter_pool_init(void);
  *
  * @retval FPC_STATUS_OK on success.
  * @retval FPC_STATUS_NULL_PTR if ctx is NULL.
- * @retval FPC_STATUS_INVALID_PARAM if cfg contains invalid parameters (NULL coeffs, invalid order).
+ * @retval FPC_STATUS_INVALID_PARAM if cfg contains invalid parameters (NULL
+ * coeffs, invalid order).
  * @retval FPC_STATUS_NOT_INITIALIZED if pool initialization failed.
  * @retval FPC_STATUS_POOL_FULL if no free filter slots available.
  *
  * @pre fpc_filter_pool_init() must have been called successfully.
  * @post *ctx is set to a valid filter handle on success.
  * @post Filter history is cleared (all samples set to zero).
- * @note The filter coefficients are copied internally; changes to the coeffs array
- *       after initialization do not affect the filter.
+ * @note The filter coefficients are copied internally; changes to the coeffs
+ * array after initialization do not affect the filter.
  * @note Filter order must be between 1 and FPC_FILTER_MAX_ORDER (inclusive).
  */
 enum fpc_status fpc_fir_init(struct fpc_fir **ctx,
-                              const struct fpc_fir_config *cfg);
+                             const struct fpc_fir_config *cfg);
 
 /**
  * @brief Reset a FIR filter's internal history buffer.
@@ -156,7 +161,8 @@ enum fpc_status fpc_fir_reset(struct fpc_fir *ctx);
  *
  * @retval FPC_STATUS_OK on success.
  * @retval FPC_STATUS_NULL_PTR if ctx is NULL.
- * @retval FPC_STATUS_INVALID_PARAM if cfg is NULL or contains invalid parameters.
+ * @retval FPC_STATUS_INVALID_PARAM if cfg is NULL or contains invalid
+ * parameters.
  * @retval FPC_STATUS_NOT_INITIALIZED if ctx is not a valid initialized filter.
  *
  * @pre fpc_fir_init() must have been called with ctx.
@@ -187,9 +193,8 @@ enum fpc_status fpc_fir_set_config(struct fpc_fir *ctx,
  * @note The filter uses Q16.16 fixed-point arithmetic internally.
  * @note Convolution is computed as: output = (sum(h[i] * x[i])) >> 16
  */
-enum fpc_status fpc_fir_process(struct fpc_fir *ctx,
-                                 int32_t sample,
-                                 int32_t *output);
+enum fpc_status fpc_fir_process(struct fpc_fir *ctx, int32_t sample,
+                                int32_t *output);
 
 /**
  * @brief Deinitialize a FIR filter instance and return it to the pool.
@@ -228,7 +233,7 @@ enum fpc_status fpc_fir_deinit(struct fpc_fir *ctx);
  * @note Coefficients must be provided in Q16.16 format.
  */
 enum fpc_status fpc_biquad_init(struct fpc_biquad **ctx,
-                                 const struct fpc_biquad_config *cfg);
+                                const struct fpc_biquad_config *cfg);
 
 /**
  * @brief Reset a biquad filter's internal state (delay elements).
@@ -264,7 +269,7 @@ enum fpc_status fpc_biquad_reset(struct fpc_biquad *ctx);
  * @post The filter delay state is reset to zero.
  */
 enum fpc_status fpc_biquad_set_config(struct fpc_biquad *ctx,
-                                       const struct fpc_biquad_config *cfg);
+                                      const struct fpc_biquad_config *cfg);
 
 /**
  * @brief Process a single sample through the biquad filter.
@@ -286,11 +291,11 @@ enum fpc_status fpc_biquad_set_config(struct fpc_biquad *ctx,
  * @note The filter uses Q16.16 fixed-point arithmetic.
  * @note Implementation evaluates the documented difference equation directly
  *       using delayed input/output samples.
- * @note Output is computed as: output = (acc) >> 16 where acc is the Q32.32 intermediate result.
+ * @note Output is computed as: output = (acc) >> 16 where acc is the Q32.32
+ * intermediate result.
  */
-enum fpc_status fpc_biquad_process(struct fpc_biquad *ctx,
-                                    int32_t sample,
-                                    int32_t *output);
+enum fpc_status fpc_biquad_process(struct fpc_biquad *ctx, int32_t sample,
+                                   int32_t *output);
 
 /**
  * @brief Deinitialize a biquad filter instance and return it to the pool.
