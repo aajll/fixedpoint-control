@@ -2,22 +2,226 @@ name: CI
 
 on:
   push:
+    branches: ["master", "main"]
   pull_request:
+    branches: ["master", "main"]
 
 jobs:
-  build-and-test:
-    runs-on: ubuntu-latest
+  # ---------------------------------------------------------------------------
+  # Build the library and run the full test suite under ASan + UBSan across
+  # the matrix: OS × fpc_filter_max_order.
+  # ---------------------------------------------------------------------------
+  test:
+    name: "Test (${{ matrix.os }}, order=${{ matrix.fpc_filter_max_order }})"
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        fpc_filter_max_order: [64, 128]
+
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install -y meson ninja-build gcc pkg-config
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install ninja (Ubuntu)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update -q && sudo apt-get install -y ninja-build
+
+      - name: Install ninja (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ninja
+
+      - name: Install meson
+        run: pip install meson
 
       - name: Configure
-        run: meson setup builddir
+        run: >
+          meson setup build
+          --buildtype=debug
+          -Dbuild_tests=true
+          -Db_sanitize=address,undefined
+          -Dfpc_filter_max_order=${{ matrix.fpc_filter_max_order }}
 
       - name: Build
-        run: meson compile -C builddir
+        run: meson compile -C build
 
       - name: Test
-        run: meson test -C builddir --verbose --print-errorlogs
+        run: meson test -C build --verbose --print-errorlogs
+
+      - name: Upload test log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: testlog-${{ matrix.os }}-order${{ matrix.fpc_filter_max_order }}
+          path: build/meson-logs/testlog.txt
+
+  # ---------------------------------------------------------------------------
+  # Release build matrix — the configuration a downstream project would use.
+  # No sanitizers, no tests; just verify the library compiles cleanly across
+  # the same axes.
+  # ---------------------------------------------------------------------------
+  release-build:
+    name: "Release (${{ matrix.os }}, order=${{ matrix.fpc_filter_max_order }})"
+    runs-on: ${{ matrix.os }}
+    needs: test
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        fpc_filter_max_order: [64, 128]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install ninja (Ubuntu)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update -q && sudo apt-get install -y ninja-build
+
+      - name: Install ninja (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ninja
+
+      - name: Install meson
+        run: pip install meson
+
+      - name: Configure
+        run: >
+          meson setup build
+          --buildtype=release
+          -Dbuild_tests=false
+          -Dfpc_filter_max_order=${{ matrix.fpc_filter_max_order }}
+
+      - name: Build
+        run: meson compile -C build
+
+  # ---------------------------------------------------------------------------
+  # Warnings-as-errors build. Catches new warnings introduced by a PR
+  # before they become technical debt.
+  # ---------------------------------------------------------------------------
+  werror:
+    name: "Warnings as errors"
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install ninja
+        run: sudo apt-get update -q && sudo apt-get install -y ninja-build
+
+      - name: Install meson
+        run: pip install meson
+
+      - name: Configure (debug + tests + werror)
+        run: >
+          meson setup build_warn
+          --buildtype=debug
+          -Dbuild_tests=true
+          -Dwerror=true
+
+      - name: Build
+        run: meson compile -C build_warn
+
+  # ---------------------------------------------------------------------------
+  # Static analysis with cppcheck. Runs against the source and the public
+  # headers; fails on any warning/style/performance/portability finding
+  # not silenced by an inline `cppcheck-suppress` comment.
+  # ---------------------------------------------------------------------------
+  cppcheck:
+    name: "Static analysis (cppcheck)"
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install cppcheck
+        run: sudo apt-get update -q && sudo apt-get install -y cppcheck
+
+      # cppcheck needs to see pool-allocator's headers (pool.h, pool_conf.h,
+      # pool_platform.h) since they appear in fpc's source. Fetch the wrap
+      # so the include path resolves.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install meson + ninja
+        run: |
+          sudo apt-get install -y ninja-build
+          pip install meson
+
+      - name: Resolve pool-allocator wrap
+        run: meson subprojects download pool-allocator
+
+      - name: Run cppcheck
+        run: >
+          cppcheck
+          --enable=warning,style,performance,portability
+          --error-exitcode=1
+          --inline-suppr
+          --std=c11
+          --suppress=missingIncludeSystem
+          --suppress=unusedFunction
+          -I include
+          -I subprojects/pool-allocator/include
+          src/ include/
+
+  # ---------------------------------------------------------------------------
+  # Memory-error gate with Valgrind. Runs the test suite under
+  # `memcheck` without compiler sanitizers (ASan and Valgrind are
+  # incompatible). Any leak, invalid read/write, or uninitialised use
+  # fails the job.
+  # ---------------------------------------------------------------------------
+  valgrind:
+    name: "Memory check (Valgrind)"
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install ninja and valgrind
+        run: sudo apt-get update -q && sudo apt-get install -y ninja-build valgrind
+
+      - name: Install meson
+        run: pip install meson
+
+      - name: Configure (debug, no sanitizers)
+        run: >
+          meson setup build
+          --buildtype=debug
+          -Dbuild_tests=true
+
+      - name: Build
+        run: meson compile -C build
+
+      - name: Test under Valgrind
+        run: >
+          meson test -C build --verbose
+          --wrapper='valgrind --error-exitcode=1 --leak-check=full
+          --show-leak-kinds=all --track-origins=yes --errors-for-leak-kinds=all'
+
+      - name: Upload Valgrind log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: valgrind-log
+          path: build/meson-logs/testlog.txt

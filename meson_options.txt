@@ -9,6 +9,10 @@ option(
 )
 
 # === Pool geometry =============================================================
+# fpc owns these two knobs and forwards them to the pool-allocator subproject.
+# The pool slot size is derived from `fpc_filter_max_order` (the largest
+# user-visible struct is `struct fpc_fir`, whose tap arrays grow linearly with
+# the order), so it is not a separate option.
 option(
   'fpc_max_instances',
   type: 'integer',
@@ -17,8 +21,8 @@ option(
 )
 
 option(
-  'fpc_pool_item_size',
+  'fpc_filter_max_order',
   type: 'integer',
-  value: 528,
-  description: 'Size in bytes of each pool slot',
+  value: 64,
+  description: 'Maximum FIR filter order (number of taps). Drives the pool slot size.',
 )

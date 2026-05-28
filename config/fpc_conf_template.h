@@ -35,28 +35,30 @@
  */
 #define FPC_MAX_INSTANCES       8
 
-/**
- * Size in bytes of each pool slot.
- *
- * Must be:
- *   - Large enough to hold the largest controller struct
- *     (currently `struct fpc_fir` at ~520 bytes with default order).
- *   - A multiple of `_Alignof(max_align_t)` (typically 16 on most platforms).
- *
- * The library will fail at compile time if the value is too small.
- */
-#define FPC_POOL_ITEM_SIZE      528
-
 /*====================
  * FILTER CONFIGURATION
  *====================*/
 
 /**
- * Maximum FIR filter order (number of taps).
- * Increasing this value grows the FIR struct's internal arrays and therefore
- * also the minimum `FPC_POOL_ITEM_SIZE`.
+ * Maximum FIR filter order (number of taps). Drives the derived pool slot
+ * size — `struct fpc_fir`'s coefficient and history arrays are sized by
+ * this value.
  */
 #define FPC_FILTER_MAX_ORDER    64U
+
+/*====================
+ * ADVANCED OVERRIDE
+ *====================*/
+
+/**
+ * Size of each pool slot. Derived from FPC_FILTER_MAX_ORDER by
+ * `include/fpc_config.h`; the `_Static_assert` in the source files is the
+ * authoritative check.
+ *
+ * Override **only** if a consumer-defined struct sharing the pool needs more
+ * space than the default formula provides. Leave undefined under normal use.
+ */
+/* #define FPC_POOL_ITEM_SIZE   1024U */
 
 #endif /* FPC_CONF_H_ */
 #endif

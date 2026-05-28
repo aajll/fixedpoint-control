@@ -43,15 +43,20 @@
 #define FPC_MAX_INSTANCES (8U)
 #endif
 
-/** Size in bytes of each pool slot (must be >= largest controller struct
- *  and a multiple of `_Alignof(max_align_t)`, typically 16). */
-#ifndef FPC_POOL_ITEM_SIZE
-#define FPC_POOL_ITEM_SIZE (528U)
-#endif
-
-/** Maximum FIR filter order (number of taps). */
+/** Maximum FIR filter order (number of taps). Drives the pool slot size. */
 #ifndef FPC_FILTER_MAX_ORDER
 #define FPC_FILTER_MAX_ORDER (64U)
+#endif
+
+/** Size of each pool slot, derived from the largest user-visible struct
+ *  (`struct fpc_fir` ≈ 8 header bytes + 2 * int32_t * order). Rounded up
+ *  to a 16-byte boundary, which is the conservative upper bound for
+ *  `_Alignof(max_align_t)` on supported targets. Override only if a
+ *  consumer-defined struct sharing the pool needs more space; the
+ *  `_Static_assert` in the source files is the authoritative check. */
+#ifndef FPC_POOL_ITEM_SIZE
+#define FPC_POOL_ITEM_SIZE                                                     \
+        ((((8U + (8U * FPC_FILTER_MAX_ORDER)) + 15U) / 16U) * 16U)
 #endif
 
 /* ------------------------------------------------------------------ */

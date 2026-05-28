@@ -1,6 +1,17 @@
 /**
  * @file fpc_pid.h
  * @brief Safety-oriented fixed-point PID controller API.
+ *
+ * @par Threading contract
+ *    fpc inherits a **single-writer / many-readers** contract from its
+ *    backing allocator. For a given controller instance:
+ *      - One context may call the mutating functions: @c fpc_pid_init,
+ *        @c fpc_pid_deinit, @c fpc_pid_reset, @c fpc_pid_set_config,
+ *        @c fpc_pid_set_mode, @c fpc_pid_compute.
+ *      - Any number of contexts may call the read-only @c fpc_pid_get_config
+ *        and @c fpc_pid_get_state concurrently with the single writer.
+ *      - Two mutating contexts that share an instance must be serialised
+ *        by the caller.
  */
 
 #ifndef FPC_PID_H_
@@ -15,8 +26,8 @@ struct fpc_pid;
  * @struct fpc_pid
  * @brief Opaque handle to a PID controller instance.
  *
- * This structure is managed by a pool allocator and should never be accessed
- * directly. It stores all state required for PID computation.
+ * This structure is managed by an internal allocator and should never be
+ * accessed directly. It stores all state required for PID computation.
  */
 
 /**

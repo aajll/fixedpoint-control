@@ -9,31 +9,61 @@
 
 ### 1.1 Essential commands
 
-#### Configure, build, and run unit tests
+#### Configure, build, and run unit tests (host, with sanitisers — matches CI)
 
 ```sh
-meson setup builddir
-meson compile -C builddir
-meson test -C builddir --verbose
+meson setup build --wipe --buildtype=debug -Dbuild_tests=true \
+                  -Db_sanitize=address,undefined
+meson compile -C build
+meson test -C build --verbose
 ```
 
 #### Override pool geometry
 
 ```sh
-meson setup builddir-custom -Dfpc_max_instances=16 -Dfpc_pool_item_size=640
+meson setup build-custom --wipe -Dbuild_tests=true \
+                          -Dfpc_max_instances=16 -Dfpc_filter_max_order=128
 ```
 
 #### Warnings-as-errors build
 
 ```sh
-meson setup builddir-warn -Dwerror=true
-meson compile -C builddir-warn
+meson setup build-warn --wipe --buildtype=debug -Dbuild_tests=true -Dwerror=true
+meson compile -C build-warn
 ```
+
+#### Static analysis (cppcheck) and memory check (Valgrind)
+
+```sh
+# cppcheck (CI gate)
+cppcheck --enable=warning,style,performance,portability --error-exitcode=1 \
+         --inline-suppr --std=c11 \
+         --suppress=missingIncludeSystem --suppress=unusedFunction \
+         -I include -I subprojects/pool-allocator/include \
+         src/ include/
+
+# Valgrind memcheck — build WITHOUT sanitizers, then wrap the test run
+meson setup build_mem --wipe --buildtype=debug -Dbuild_tests=true
+meson compile -C build_mem
+meson test -C build_mem --verbose \
+  --wrapper='valgrind --error-exitcode=1 --leak-check=full \
+             --show-leak-kinds=all --track-origins=yes \
+             --errors-for-leak-kinds=all'
+```
+
+#### TI C2000 cross build (library only)
+
+```sh
+meson setup build_c2000 --wipe --cross-file=ti-c2000.ini -Dbuild_tests=false
+meson compile -C build_c2000
+```
+
+The cross file is user-provided. Not gated in CI (no TI toolchain on the runner).
 
 #### Notes
 
 - `meson setup` generates `fpc_version.h` and `fpc_conf.h` into the **build directory**
-- Tests are always compiled; there is no build-time option to disable them
+- Tests are gated by `-Dbuild_tests=true`; default is `false` for a clean library build
 - Pool allocator subproject (`pool-allocator`) is fetched automatically on first configure
 
 ---
@@ -78,12 +108,16 @@ meson compile -C builddir-warn
 - Match conventions in the existing files (indentation, braces, naming).
 - Validate pointer arguments at every public API boundary.
 - No heap allocation (`malloc` / `free` / VLAs).
-- Use `uint32_t`, `uint16_t`, `int16_t`, `bool` from `<stdint.h>` /
-  `<stdbool.h>` — never plain `int` for fixed-width fields.
+- Use fixed-width types from `<stdint.h>` / `<stdbool.h>` — never plain `int`
+  for fixed-width fields. For byte-sized scalar fields use `uint_least8_t`
+  (not `uint8_t`) so the code stays portable to targets where `CHAR_BIT == 16`
+  (the C11 standard requires `uint8_t` to be exactly 8 bits; on the TI C2000
+  it is not defined).
 
 ### Error handling
 
-- Public functions return `bool` or validate via early `return`.
+- Public functions return `enum fpc_status`. Outputs are written through
+  out-parameters so a valid `FPC_STATUS_OK` is never ambiguous.
 - No `errno`; no exceptions.
 
 ### Testing

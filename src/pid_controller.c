@@ -20,8 +20,8 @@
 /** @internal */
 struct fpc_pid {
         pool_id_t pool_id;
-        uint8_t initialized;
-        uint8_t mode;
+        uint_least8_t initialized;
+        uint_least8_t mode;
         uint16_t reserved;
         int32_t manual_output;
         int32_t kp;
@@ -138,7 +138,7 @@ fpc_pid_config_is_valid(const struct fpc_pid_config *cfg)
 static enum fpc_status
 fpc_pid_get_valid_pointer(struct fpc_pid *ctx, struct fpc_pid **valid_ctx)
 {
-        void *pool_ptr = NULL;
+        const void *pool_ptr = NULL;
 
         if ((ctx == NULL) || (valid_ctx == NULL)) {
                 return FPC_STATUS_NULL_PTR;
@@ -153,7 +153,7 @@ fpc_pid_get_valid_pointer(struct fpc_pid *ctx, struct fpc_pid **valid_ctx)
         }
 
         pool_ptr = pool_get_pointer(fpc_pid_pool_handle, ctx->pool_id);
-        if (pool_ptr != (void *)ctx) {
+        if (pool_ptr != (const void *)ctx) {
                 return FPC_STATUS_NOT_INITIALIZED;
         }
 
@@ -182,7 +182,7 @@ static enum fpc_status
 fpc_pid_get_valid_const_pointer(const struct fpc_pid *ctx,
                                 const struct fpc_pid **valid_ctx)
 {
-        void *pool_ptr = NULL;
+        const void *pool_ptr = NULL;
 
         if ((ctx == NULL) || (valid_ctx == NULL)) {
                 return FPC_STATUS_NULL_PTR;
@@ -197,7 +197,7 @@ fpc_pid_get_valid_const_pointer(const struct fpc_pid *ctx,
         }
 
         pool_ptr = pool_get_pointer(fpc_pid_pool_handle, ctx->pool_id);
-        if (pool_ptr != (void *)ctx) {
+        if (pool_ptr != (const void *)ctx) {
                 return FPC_STATUS_NOT_INITIALIZED;
         }
 
@@ -315,7 +315,7 @@ fpc_pid_init(struct fpc_pid **ctx, const struct fpc_pid_config *cfg)
         pid = (struct fpc_pid *)pool_ptr;
         pid->pool_id = pool_id;
         pid->initialized = 1U;
-        pid->mode = (uint8_t)FPC_PID_MODE_AUTO;
+        pid->mode = (uint_least8_t)FPC_PID_MODE_AUTO;
         pid->manual_output = 0;
         fpc_pid_copy_config(pid, cfg);
         pid->integral = 0;
@@ -450,8 +450,6 @@ fpc_pid_set_mode(struct fpc_pid *ctx, enum fpc_pid_mode mode,
         struct fpc_pid *valid_ctx = NULL;
         enum fpc_status status;
         bool clamped = false;
-        int64_t proportional64;
-        int64_t rebias64;
 
         if ((mode != FPC_PID_MODE_AUTO) && (mode != FPC_PID_MODE_MANUAL)) {
                 return FPC_STATUS_INVALID_PARAM;
@@ -463,22 +461,23 @@ fpc_pid_set_mode(struct fpc_pid *ctx, enum fpc_pid_mode mode,
         }
 
         if (mode == FPC_PID_MODE_MANUAL) {
-                valid_ctx->mode = (uint8_t)FPC_PID_MODE_MANUAL;
+                valid_ctx->mode = (uint_least8_t)FPC_PID_MODE_MANUAL;
                 return fpc_pid_set_manual_output(valid_ctx, manual_output);
         }
 
         if ((enum fpc_pid_mode)valid_ctx->mode == FPC_PID_MODE_MANUAL) {
-                proportional64 =
+                const int64_t proportional64 =
                     ((int64_t)valid_ctx->kp * (int64_t)valid_ctx->prev_error)
                     / (int64_t)valid_ctx->dt;
-                rebias64 = (int64_t)valid_ctx->last_output - proportional64
-                           - (int64_t)valid_ctx->filtered_derivative;
+                const int64_t rebias64 =
+                    (int64_t)valid_ctx->last_output - proportional64
+                    - (int64_t)valid_ctx->filtered_derivative;
                 valid_ctx->integral =
                     fpc_clamp_int32(rebias64, valid_ctx->integral_min,
                                     valid_ctx->integral_max, &clamped);
         }
 
-        valid_ctx->mode = (uint8_t)FPC_PID_MODE_AUTO;
+        valid_ctx->mode = (uint_least8_t)FPC_PID_MODE_AUTO;
         return clamped ? FPC_STATUS_SATURATED : FPC_STATUS_OK;
 }
 

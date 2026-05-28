@@ -21,16 +21,16 @@ struct fpc_fir {
         pool_id_t pool_id;
         uint16_t order;
         uint16_t head;
-        uint8_t initialized;
-        uint8_t reserved[1];
+        uint_least8_t initialized;
+        uint_least8_t reserved[1];
         int32_t coeffs[FPC_FILTER_MAX_ORDER];
         int32_t history[FPC_FILTER_MAX_ORDER];
 };
 
 struct fpc_biquad {
         pool_id_t pool_id;
-        uint8_t initialized;
-        uint8_t reserved[1];
+        uint_least8_t initialized;
+        uint_least8_t reserved[1];
         int32_t b0;
         int32_t b1;
         int32_t b2;

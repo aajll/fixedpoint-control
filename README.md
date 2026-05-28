@@ -1,6 +1,6 @@
 # fixedpoint-control
 
-[![CI](https://github.com/ACIDBURN2501/fixedpoint-control/actions/workflows/ci.yml/badge.svg)](https://github.com/ACIDBURN2501/fixedpoint-control/actions/workflows/ci.yml)
+[![CI](https://github.com/aajll/fixedpoint-control/actions/workflows/ci.yml/badge.svg)](https://github.com/aajll/fixedpoint-control/actions/workflows/ci.yml)
 
 Safety-oriented fixed-point PID controller and discrete filter library in C for
 embedded systems.
@@ -196,19 +196,27 @@ which source is used, because every define is `#ifndef`-guarded.
 | Macro | Description | Default |
 |---|---|---|
 | `FPC_MAX_INSTANCES` | Slot count for each internal pool (PID, FIR, and biquad each get their own pool of this size). | `8` |
-| `FPC_POOL_ITEM_SIZE` | Size in bytes of each pool slot. Must be ≥ the largest pooled struct and a multiple of `_Alignof(max_align_t)`. | `528` |
-| `FPC_FILTER_MAX_ORDER` | Maximum FIR filter order (number of taps). | `64` |
+| `FPC_FILTER_MAX_ORDER` | Maximum FIR filter order (number of taps). Drives the pool slot size. | `64` |
+| `FPC_POOL_ITEM_SIZE` | Size of each pool slot. **Derived** from `FPC_FILTER_MAX_ORDER` via `ceil_to_align(8 + 8 * order, 16)`; equals `528` at the default order. Override only if a consumer-defined struct sharing the pool needs more space; the `_Static_assert` in the source files is the authoritative check. | derived |
 
 ### Meson build options
 
 When building with Meson, options are set at configure time and the values are
-written into `builddir/fpc_conf.h` automatically, no manual header editing
-required.
+written into `builddir/fpc_conf.h` automatically; no manual header editing
+required. The Meson build derives the pool slot size from `fpc_filter_max_order`
+using the same formula as the C header, so there is no separate option for it.
 
 | Option | Description | Default |
 |---|---|---|
+| `build_tests` | Build and run the unit tests. | `false` |
 | `fpc_max_instances` | Maximum number of instances per internal pool. | `8` |
-| `fpc_pool_item_size` | Size in bytes of each pool slot. Must fit the largest pooled object. | `528` |
+| `fpc_filter_max_order` | Maximum FIR filter order (taps). Drives the derived pool slot size. | `64` |
+
+Downstream consumers using fpc as a Meson subproject can also forward
+arguments to the wrapped pool-allocator subproject via
+`-Dpool-allocator:<option>=<value>` (e.g. `-Dpool-allocator:atomicity_mode=volatile`).
+The pool's `auto` atomicity default already selects the correct mode based on
+target `CHAR_BIT`.
 
 ### Drag-drop / no build system
 
@@ -226,36 +234,73 @@ values to match your target.
 ## Building
 
 ```sh
-# Configure, build, and test
-meson setup builddir
-meson compile -C builddir
-meson test -C builddir --verbose
+# Library only (release)
+meson setup build --buildtype=release -Dbuild_tests=false
+meson compile -C build
+
+# With unit tests
+meson setup build --buildtype=debug -Dbuild_tests=true
+meson compile -C build
+meson test -C build --verbose
 
 # Override pool geometry
-meson setup builddir-custom -Dfpc_max_instances=16 -Dfpc_pool_item_size=640
+meson setup build-custom -Dbuild_tests=true \
+                          -Dfpc_max_instances=16 -Dfpc_filter_max_order=128
 
 # Install into a staging directory
-meson install -C builddir --destdir staging
+meson install -C build --destdir staging
 ```
+
+## Platform Support
+
+The library auto-detects its addressing model from `<limits.h>` and works on
+any C11 toolchain whose `CHAR_BIT` is 8 or 16. There are no chip-specific code
+paths.
+
+| Toolchain               | Target                    | Status                |
+|-------------------------|---------------------------|-----------------------|
+| GCC, Clang              | x86_64 Linux              | Host tests (CI)       |
+| GCC, Clang              | x86_64 macOS              | Host tests (CI)       |
+| GCC, Clang              | aarch64 Linux             | Compiles via cross    |
+| TI C2000 CGT 25.11 LTS  | TI C2000 family (16-bit MAU) | Library cross-build (local) |
+
+The TI C2000 cross-build is a **local pre-submit** check; the GitHub Actions
+runner does not have the TI toolchain. Internal scalar fields that need a
+byte-sized integer use `uint_least8_t` rather than `uint8_t` so the headers
+compile on targets where `CHAR_BIT == 16` (the C11 standard requires `uint8_t`
+to be *exactly* 8 bits, so it is not provided on the C2000).
 
 ## CI And Static Analysis
 
-The repository includes a basic CI workflow in `.github/workflows/ci.yml` that
-configures, builds, and tests the project on GitHub Actions.
+The repository's CI workflow (`.github/workflows/ci.yml`) gates:
 
-The in-repo CI currently does not enforce MISRA checks or run static-analysis
-tools automatically.
+- **Test matrix**: `OS × fpc_filter_max_order` (Ubuntu and macOS, default and a
+  larger order). Each test run links against `-Db_sanitize=address,undefined`.
+- **Release build matrix**: same axes, no sanitizers, no tests; verifies the
+  library compiles cleanly in the configuration a downstream project would use.
+- **Warnings-as-errors**: `meson setup ... -Dwerror=true` and compile.
+- **`cppcheck`**: warning + style + performance + portability, with
+  `--error-exitcode=1` and inline-suppression handling.
+- **`valgrind memcheck`**: full leak check, errors-for-leak-kinds=all, with
+  ASan disabled in the build (the two are incompatible).
 
 Recommended additional verification for compliance-focused use:
 
 ```sh
-# Example warning-focused build
-meson setup builddir -Dwerror=true
-meson compile -C builddir
+# Static analysis
+cppcheck --enable=warning,style,performance,portability --error-exitcode=1 \
+         --inline-suppr --std=c11 \
+         --suppress=missingIncludeSystem --suppress=unusedFunction \
+         -I include -I subprojects/pool-allocator/include \
+         src/ include/
 
-# Example external analysis tools
-cppcheck --enable=warning,style,performance,portability src include tests
-clang --analyze src/pid_controller.c src/filters.c
+# Valgrind memcheck (debug build with NO sanitizers)
+meson setup build_mem --buildtype=debug -Dbuild_tests=true
+meson compile -C build_mem
+meson test -C build_mem --verbose \
+  --wrapper='valgrind --error-exitcode=1 --leak-check=full \
+             --show-leak-kinds=all --track-origins=yes \
+             --errors-for-leak-kinds=all'
 ```
 
 ## Notes
@@ -264,7 +309,7 @@ clang --analyze src/pid_controller.c src/filters.c
 |---|---|
 | **Version header** | `fpc_version.h` is generated into the build directory from `config/fpc_version.h.in`. It should not be source-controlled. |
 | **Build config header** | `fpc_conf.h` is generated into the build directory from `config/fpc_conf.h.in`. It should not be source-controlled. |
-| **Thread safety** | The wrapped pool allocator dependency is used without synchronization in this repository. If you need serialized pool access, review the allocator's locking hooks and validate the integration in your target environment. |
+| **Thread safety** | fpc inherits pool-allocator's **single-writer / many-readers** contract. One context may call the mutating functions (`*_init`, `*_deinit`, `*_set_config`, `*_set_mode`, `*_reset`, `*_compute`, `*_process`) on a given instance; any number of contexts may call the read-only `*_get_config` / `*_get_state` concurrently. Two mutating contexts that share an instance must be serialised by the caller. The pool's per-slot status is `_Atomic` (or `volatile` on toolchains without `<stdatomic.h>`), selected automatically. |
 | **Manual mode** | `fpc_pid_set_mode()` can hold a manual output and rebias the integral term when returning to auto mode. |
 | **Derivative smoothing** | `d_filter_alpha` is a Q16.16 coefficient. `65536U` disables smoothing; smaller values apply stronger low-pass filtering. |
 | **Caller ownership** | Discard stale pointers after `*_deinit()`. Context pointers are invalid once returned to the pool. |

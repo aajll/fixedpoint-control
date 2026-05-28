@@ -1,5 +1,5 @@
 [wrap-git]
 directory = pool-allocator
-url = https://github.com/ACIDBURN2501/pool-allocator.git
-revision = v1.1.3 
+url = https://github.com/aajll/pool-allocator.git
+revision = v2.0.0 
 clone_depth = 1

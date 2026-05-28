@@ -8,6 +8,16 @@
  *
  * Both filter types use Q16.16 fixed-point arithmetic for efficient computation
  * on embedded systems without floating-point support.
+ *
+ * @par Threading contract
+ *    fpc inherits a **single-writer / many-readers** contract from its
+ *    backing allocator. For a given filter instance:
+ *      - One context may call the mutating functions: @c fpc_*_init,
+ *        @c fpc_*_deinit, @c fpc_*_reset, @c fpc_*_set_config,
+ *        @c fpc_*_process.
+ *      - Read-only callers may run concurrently with the single writer.
+ *      - Two mutating contexts that share an instance must be serialised
+ *        by the caller.
  */
 
 #ifndef FPC_FILTERS_H_
@@ -25,7 +35,7 @@ struct fpc_biquad;
  * @struct fpc_fir
  * @brief Opaque handle to a FIR filter instance.
  *
- * This structure is managed by a pool allocator and stores the filter's
+ * This structure is managed by an internal allocator and stores the filter's
  * coefficients and history buffer for the convolution operation.
  */
 
@@ -33,7 +43,7 @@ struct fpc_biquad;
  * @struct fpc_biquad
  * @brief Opaque handle to a biquad (IIR) filter instance.
  *
- * This structure is managed by a pool allocator and stores the filter's
+ * This structure is managed by an internal allocator and stores the filter's
  * difference equation coefficients and internal state (delay elements).
  */
 
