@@ -14,6 +14,7 @@
 #define FPC_FILTERS_H_
 
 #include "fpc_config.h"
+
 #include "fpc_status.h"
 #include <stdint.h>
 
