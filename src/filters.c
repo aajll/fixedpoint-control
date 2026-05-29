@@ -124,7 +124,7 @@ fpc_biquad_config_is_valid(const struct fpc_biquad_config *cfg)
 static enum fpc_status
 fpc_fir_get_valid_pointer(struct fpc_fir *ctx, struct fpc_fir **valid_ctx)
 {
-        void *pool_ptr = NULL;
+        const void *pool_ptr = NULL;
 
         if ((ctx == NULL) || (valid_ctx == NULL)) {
                 return FPC_STATUS_NULL_PTR;
@@ -139,7 +139,7 @@ fpc_fir_get_valid_pointer(struct fpc_fir *ctx, struct fpc_fir **valid_ctx)
         }
 
         pool_ptr = pool_get_pointer(fpc_fir_pool_handle, ctx->pool_id);
-        if (pool_ptr != (void *)ctx) {
+        if (pool_ptr != (const void *)ctx) {
                 return FPC_STATUS_NOT_INITIALIZED;
         }
 
@@ -168,7 +168,7 @@ static enum fpc_status
 fpc_biquad_get_valid_pointer(struct fpc_biquad *ctx,
                              struct fpc_biquad **valid_ctx)
 {
-        void *pool_ptr = NULL;
+        const void *pool_ptr = NULL;
 
         if ((ctx == NULL) || (valid_ctx == NULL)) {
                 return FPC_STATUS_NULL_PTR;
@@ -183,7 +183,7 @@ fpc_biquad_get_valid_pointer(struct fpc_biquad *ctx,
         }
 
         pool_ptr = pool_get_pointer(fpc_biquad_pool_handle, ctx->pool_id);
-        if (pool_ptr != (void *)ctx) {
+        if (pool_ptr != (const void *)ctx) {
                 return FPC_STATUS_NOT_INITIALIZED;
         }
 

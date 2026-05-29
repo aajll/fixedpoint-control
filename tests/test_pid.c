@@ -17,7 +17,8 @@ test_config(void)
                                      .out_max = 100,
                                      .integral_min = -50,
                                      .integral_max = 50,
-                                     .d_filter_alpha = 65536U};
+                                     .d_filter_alpha
+                                     = FPC_PID_D_FILTER_ALPHA_MAX};
 
         return cfg;
 }
@@ -75,7 +76,7 @@ TEST_CASE(test_invalid_config_rejected)
         TEST_ASSERT(fpc_pid_init(&ctx, &cfg) == FPC_STATUS_INVALID_PARAM);
 
         cfg = test_config();
-        cfg.d_filter_alpha = 65537U;
+        cfg.d_filter_alpha = FPC_PID_D_FILTER_ALPHA_MAX + 1U;
         TEST_ASSERT(fpc_pid_init(&ctx, &cfg) == FPC_STATUS_INVALID_PARAM);
 }
 

@@ -23,6 +23,14 @@
 struct fpc_pid;
 
 /**
+ * Maximum value `fpc_pid_config.d_filter_alpha` may take, and the value
+ * that disables derivative smoothing. Numerically `65536` — i.e. the
+ * Q16.16 representation of `1.0`. The field itself is `uint32_t`, so the
+ * value fits with room to spare.
+ */
+#define FPC_PID_D_FILTER_ALPHA_MAX (65536U)
+
+/**
  * @struct fpc_pid
  * @brief Opaque handle to a PID controller instance.
  *

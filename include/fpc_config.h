@@ -25,7 +25,12 @@
 /* ------------------------------------------------------------------ */
 
 #if defined(FPC_CONF_PATH)
-/* Explicit path supplied via -DFPC_CONF_PATH=\"...\" */
+/* Explicit path supplied via -DFPC_CONF_PATH=\"...\". The cppcheck
+ * suppression below silences a false positive: cppcheck explores both
+ * preprocessor branches and, when FPC_CONF_PATH is undefined, the
+ * `#include` line looks empty to it. The actual code path is unreachable
+ * unless the consumer explicitly defines the macro. */
+/* cppcheck-suppress preprocessorErrorDirective */
 #include FPC_CONF_PATH
 
 #elif defined(__has_include)

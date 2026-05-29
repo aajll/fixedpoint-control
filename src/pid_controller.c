@@ -111,7 +111,7 @@ fpc_pid_config_is_valid(const struct fpc_pid_config *cfg)
                 return false;
         }
 
-        if (cfg->d_filter_alpha > 65536U) {
+        if (cfg->d_filter_alpha > FPC_PID_D_FILTER_ALPHA_MAX) {
                 return false;
         }
 
@@ -552,7 +552,7 @@ fpc_pid_compute(struct fpc_pid *ctx, int32_t setpoint, int32_t measurement,
         derivative_step64 = ((int64_t)valid_ctx->d_filter_alpha
                              * ((int64_t)raw_derivative
                                 - (int64_t)valid_ctx->filtered_derivative))
-                            / 65536LL;
+                            / FPC_PID_D_FILTER_ALPHA_MAX;
         filtered_derivative64 =
             (int64_t)valid_ctx->filtered_derivative + derivative_step64;
 

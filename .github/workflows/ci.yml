@@ -168,6 +168,13 @@ jobs:
         run: meson subprojects download pool-allocator
 
       - name: Run cppcheck
+        # `preprocessorErrorDirective` is suppressed at the file level for
+        # include/fpc_config.h: cppcheck explores both branches of the
+        # `#if defined(FPC_CONF_PATH)` guard and flags the `#include
+        # FPC_CONF_PATH` line as empty when the macro is undefined. The
+        # inline `cppcheck-suppress` in the header documents the intent;
+        # this CLI suppression is belt-and-braces in case the inline form
+        # is not honoured by older cppcheck versions on the runner.
         run: >
           cppcheck
           --enable=warning,style,performance,portability
@@ -176,6 +183,7 @@ jobs:
           --std=c11
           --suppress=missingIncludeSystem
           --suppress=unusedFunction
+          --suppress=preprocessorErrorDirective:include/fpc_config.h
           -I include
           -I subprojects/pool-allocator/include
           src/ include/

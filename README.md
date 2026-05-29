@@ -83,7 +83,7 @@ int main(void)
                 .out_max = 100,
                 .integral_min = -50,
                 .integral_max = 50,
-                .d_filter_alpha = 65536U
+                .d_filter_alpha = FPC_PID_D_FILTER_ALPHA_MAX
         };
         int32_t                output = 0;
 
@@ -193,11 +193,11 @@ which source is used, because every define is `#ifndef`-guarded.
 
 ### Configurable values
 
-| Macro | Description | Default |
-|---|---|---|
-| `FPC_MAX_INSTANCES` | Slot count for each internal pool (PID, FIR, and biquad each get their own pool of this size). | `8` |
-| `FPC_FILTER_MAX_ORDER` | Maximum FIR filter order (number of taps). Drives the pool slot size. | `64` |
-| `FPC_POOL_ITEM_SIZE` | Size of each pool slot. **Derived** from `FPC_FILTER_MAX_ORDER` via `ceil_to_align(8 + 8 * order, 16)`; equals `528` at the default order. Override only if a consumer-defined struct sharing the pool needs more space; the `_Static_assert` in the source files is the authoritative check. | derived |
+| Macro                  | Description                                                                                                                                                                                                                                                                                   | Default |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| `FPC_MAX_INSTANCES`    | Slot count for each internal pool (PID, FIR, and biquad each get their own pool of this size).                                                                                                                                                                                                | `8`     |
+| `FPC_FILTER_MAX_ORDER` | Maximum FIR filter order (number of taps). Drives the pool slot size.                                                                                                                                                                                                                         | `64`    |
+| `FPC_POOL_ITEM_SIZE`   | Size of each pool slot. **Derived** from `FPC_FILTER_MAX_ORDER` via `ceil_to_align(8 + 8 * order, 16)`; equals `528` at the default order. Override only if a consumer-defined struct sharing the pool needs more space; the `_Static_assert` in the source files is the authoritative check. | derived |
 
 ### Meson build options
 
@@ -206,11 +206,11 @@ written into `builddir/fpc_conf.h` automatically; no manual header editing
 required. The Meson build derives the pool slot size from `fpc_filter_max_order`
 using the same formula as the C header, so there is no separate option for it.
 
-| Option | Description | Default |
-|---|---|---|
-| `build_tests` | Build and run the unit tests. | `false` |
-| `fpc_max_instances` | Maximum number of instances per internal pool. | `8` |
-| `fpc_filter_max_order` | Maximum FIR filter order (taps). Drives the derived pool slot size. | `64` |
+| Option                 | Description                                                         | Default |
+| ---------------------- | ------------------------------------------------------------------- | ------- |
+| `build_tests`          | Build and run the unit tests.                                       | `false` |
+| `fpc_max_instances`    | Maximum number of instances per internal pool.                      | `8`     |
+| `fpc_filter_max_order` | Maximum FIR filter order (taps). Drives the derived pool slot size. | `64`    |
 
 Downstream consumers using fpc as a Meson subproject can also forward
 arguments to the wrapped pool-allocator subproject via
@@ -257,61 +257,28 @@ The library auto-detects its addressing model from `<limits.h>` and works on
 any C11 toolchain whose `CHAR_BIT` is 8 or 16. There are no chip-specific code
 paths.
 
-| Toolchain               | Target                    | Status                |
-|-------------------------|---------------------------|-----------------------|
-| GCC, Clang              | x86_64 Linux              | Host tests (CI)       |
-| GCC, Clang              | x86_64 macOS              | Host tests (CI)       |
-| GCC, Clang              | aarch64 Linux             | Compiles via cross    |
-| TI C2000 CGT 25.11 LTS  | TI C2000 family (16-bit MAU) | Library cross-build (local) |
+| Toolchain              | Target                       | Status                      |
+| ---------------------- | ---------------------------- | --------------------------- |
+| GCC, Clang             | x86_64 Linux                 | Host tests (CI)             |
+| GCC, Clang             | x86_64 macOS                 | Host tests (CI)             |
+| GCC, Clang             | aarch64 Linux                | Compiles via cross          |
+| TI C2000 CGT 25.11 LTS | TI C2000 family (16-bit MAU) | Library cross-build (local) |
 
 The TI C2000 cross-build is a **local pre-submit** check; the GitHub Actions
 runner does not have the TI toolchain. Internal scalar fields that need a
 byte-sized integer use `uint_least8_t` rather than `uint8_t` so the headers
 compile on targets where `CHAR_BIT == 16` (the C11 standard requires `uint8_t`
-to be *exactly* 8 bits, so it is not provided on the C2000).
-
-## CI And Static Analysis
-
-The repository's CI workflow (`.github/workflows/ci.yml`) gates:
-
-- **Test matrix**: `OS × fpc_filter_max_order` (Ubuntu and macOS, default and a
-  larger order). Each test run links against `-Db_sanitize=address,undefined`.
-- **Release build matrix**: same axes, no sanitizers, no tests; verifies the
-  library compiles cleanly in the configuration a downstream project would use.
-- **Warnings-as-errors**: `meson setup ... -Dwerror=true` and compile.
-- **`cppcheck`**: warning + style + performance + portability, with
-  `--error-exitcode=1` and inline-suppression handling.
-- **`valgrind memcheck`**: full leak check, errors-for-leak-kinds=all, with
-  ASan disabled in the build (the two are incompatible).
-
-Recommended additional verification for compliance-focused use:
-
-```sh
-# Static analysis
-cppcheck --enable=warning,style,performance,portability --error-exitcode=1 \
-         --inline-suppr --std=c11 \
-         --suppress=missingIncludeSystem --suppress=unusedFunction \
-         -I include -I subprojects/pool-allocator/include \
-         src/ include/
-
-# Valgrind memcheck (debug build with NO sanitizers)
-meson setup build_mem --buildtype=debug -Dbuild_tests=true
-meson compile -C build_mem
-meson test -C build_mem --verbose \
-  --wrapper='valgrind --error-exitcode=1 --leak-check=full \
-             --show-leak-kinds=all --track-origins=yes \
-             --errors-for-leak-kinds=all'
-```
+to be _exactly_ 8 bits, so it is not provided on the C2000).
 
 ## Notes
 
-| Topic | Note |
-|---|---|
-| **Version header** | `fpc_version.h` is generated into the build directory from `config/fpc_version.h.in`. It should not be source-controlled. |
-| **Build config header** | `fpc_conf.h` is generated into the build directory from `config/fpc_conf.h.in`. It should not be source-controlled. |
-| **Thread safety** | fpc inherits pool-allocator's **single-writer / many-readers** contract. One context may call the mutating functions (`*_init`, `*_deinit`, `*_set_config`, `*_set_mode`, `*_reset`, `*_compute`, `*_process`) on a given instance; any number of contexts may call the read-only `*_get_config` / `*_get_state` concurrently. Two mutating contexts that share an instance must be serialised by the caller. The pool's per-slot status is `_Atomic` (or `volatile` on toolchains without `<stdatomic.h>`), selected automatically. |
-| **Manual mode** | `fpc_pid_set_mode()` can hold a manual output and rebias the integral term when returning to auto mode. |
-| **Derivative smoothing** | `d_filter_alpha` is a Q16.16 coefficient. `65536U` disables smoothing; smaller values apply stronger low-pass filtering. |
-| **Caller ownership** | Discard stale pointers after `*_deinit()`. Context pointers are invalid once returned to the pool. |
-| **Compliance scope** | The code is compliance-oriented, not certified. Formal MISRA/IEC-61508 evidence still requires project-specific analysis and lifecycle artifacts. |
-| **License** | The repository is released under the MIT license in `LICENSE`. |
+| Topic                    | Note                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Version header**       | `fpc_version.h` is generated into the build directory from `config/fpc_version.h.in`. It should not be source-controlled.                                                                                                                                                                                                                                                                                                                                                                                                            |
+| **Build config header**  | `fpc_conf.h` is generated into the build directory from `config/fpc_conf.h.in`. It should not be source-controlled.                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| **Thread safety**        | fpc inherits pool-allocator's **single-writer / many-readers** contract. One context may call the mutating functions (`*_init`, `*_deinit`, `*_set_config`, `*_set_mode`, `*_reset`, `*_compute`, `*_process`) on a given instance; any number of contexts may call the read-only `*_get_config` / `*_get_state` concurrently. Two mutating contexts that share an instance must be serialised by the caller. The pool's per-slot status is `_Atomic` (or `volatile` on toolchains without `<stdatomic.h>`), selected automatically. |
+| **Manual mode**          | `fpc_pid_set_mode()` can hold a manual output and rebias the integral term when returning to auto mode.                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| **Derivative smoothing** | `d_filter_alpha` is a Q16.16 coefficient (stored as `uint32_t`). `FPC_PID_D_FILTER_ALPHA_MAX` (= `65536U`, the Q16.16 representation of `1.0`) disables smoothing; smaller values apply stronger low-pass filtering.                                                                                                                                                                                                                                                                                                                 |
+| **Caller ownership**     | Discard stale pointers after `*_deinit()`. Context pointers are invalid once returned to the pool.                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| **Compliance scope**     | The code is compliance-oriented, not certified. Formal MISRA/IEC-61508 evidence still requires project-specific analysis and lifecycle artifacts.                                                                                                                                                                                                                                                                                                                                                                                    |
+| **License**              | The repository is released under the MIT license in `LICENSE`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
