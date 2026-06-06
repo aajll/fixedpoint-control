@@ -1,6 +1,10 @@
 /**
- * @file fpc_version.h
- * @brief Auto-generated version header.
+ * SPDX-License-Identifier: MIT
+ *
+ * @file: fpc_version.h
+ *
+ * @brief
+ *    Auto-generated version header.
  */
 
 #pragma once

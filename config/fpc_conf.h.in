@@ -1,6 +1,10 @@
 /**
- * @file fpc_conf.h
- * @brief Auto-generated configuration (Meson build system).
+ * SPDX-License-Identifier: MIT
+ *
+ * @file: fpc_conf.h
+ *
+ * @brief
+ *    Auto-generated configuration (Meson build system).
  *
  * Do not edit — this file is written by `configure_file()`.
  * To override values, use `-D` options with `meson setup`.

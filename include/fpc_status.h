@@ -1,6 +1,10 @@
 /**
- * @file fpc_status.h
- * @brief Shared status codes for fixedpoint-control APIs.
+ * SPDX-License-Identifier: MIT
+ *
+ * @file: fpc_status.h
+ *
+ * @brief
+ *    Shared status codes for fixedpoint-control APIs.
  */
 
 #ifndef FPC_STATUS_H_

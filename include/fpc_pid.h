@@ -1,6 +1,10 @@
 /**
- * @file fpc_pid.h
- * @brief Safety-oriented fixed-point PID controller API.
+ * SPDX-License-Identifier: MIT
+ *
+ * @file: fpc_pid.h
+ *
+ * @brief
+ *    Safety-oriented fixed-point PID controller API.
  *
  * @par Threading contract
  *    fpc inherits a **single-writer / many-readers** contract from its
