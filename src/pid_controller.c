@@ -1,6 +1,10 @@
 /**
- * @file pid_controller.c
- * @brief Fixed-point PID controller implementation.
+ * SPDX-License-Identifier: MIT
+ *
+ * @file: pid_controller.c
+ *
+ * @brief
+ *    Fixed-point PID controller implementation.
  *
  * Provides the concrete implementation of the PID API declared in @ref
  * fpc_pid.h. Instances are allocated from a fixed-size pool configured via @ref

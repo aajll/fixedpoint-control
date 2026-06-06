@@ -1,6 +1,10 @@
 /**
- * @file fpc_filters.h
- * @brief Safety-oriented FIR and biquad filter APIs.
+ * SPDX-License-Identifier: MIT
+ *
+ * @file: fpc_filters.h
+ *
+ * @brief
+ *    Safety-oriented FIR and biquad filter APIs.
  *
  * This module provides fixed-point implementations of:
  *   - Finite Impulse Response (FIR) filters

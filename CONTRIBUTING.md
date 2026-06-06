@@ -66,7 +66,7 @@ cppcheck --enable=warning,style,performance,portability --error-exitcode=1 \
          -I include -I subprojects/pool-allocator/include \
          src/ include/
 
-# Memcheck (debug build with NO sanitizers)
+# Memcheck (debug build with NO sanitisers)
 meson setup build_mem --buildtype=debug -Dbuild_tests=true
 meson compile -C build_mem
 meson test -C build_mem --verbose \
@@ -92,7 +92,7 @@ meson compile -C build_warn
 
 ## API Stability and Compatibility
 
-This project prioritizes safety and correctness over strict backward compatibility.
+This project prioritises safety and correctness over strict backward compatibility.
 
 - **No automatic backward compatibility**: Unless explicitly requested, breaking changes to the public API are acceptable to improve safety or correctness.
 - **Breaking changes**: Major changes should be communicated via the PR description.

@@ -1,6 +1,10 @@
 /**
- * @file fpc_config.h
- * @brief Central configuration header for fixedpoint-control.
+ * SPDX-License-Identifier: MIT
+ *
+ * @file: fpc_config.h
+ *
+ * @brief
+ *    Central configuration header for fixedpoint-control.
  *
  * This header resolves all compile-time configuration for the library.
  * It checks three sources in priority order:

@@ -42,7 +42,7 @@ cppcheck --enable=warning,style,performance,portability --error-exitcode=1 \
          -I include -I subprojects/pool-allocator/include \
          src/ include/
 
-# Valgrind memcheck — build WITHOUT sanitizers, then wrap the test run
+# Valgrind memcheck — build WITHOUT sanitisers, then wrap the test run
 meson setup build_mem --wipe --buildtype=debug -Dbuild_tests=true
 meson compile -C build_mem
 meson test -C build_mem --verbose \

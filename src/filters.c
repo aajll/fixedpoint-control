@@ -1,6 +1,10 @@
 /**
- * @file filters.c
- * @brief Fixed-point FIR and biquad filter implementations.
+ * SPDX-License-Identifier: MIT
+ *
+ * @file: filters.c
+ *
+ * @brief
+ *    Fixed-point FIR and biquad filter implementations.
  *
  * Implements the FIR and biquad (second‑order IIR) filter APIs declared in
  * @ref fpc_filters.h. All filters use Q16.16 fixed‑point arithmetic and share a

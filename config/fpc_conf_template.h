@@ -1,6 +1,10 @@
 /**
- * @file fpc_conf.h
- * @brief User configuration file for fixedpoint-control.
+ * SPDX-License-Identifier: MIT
+ *
+ * @file: fpc_conf.h
+ *
+ * @brief
+ *    User configuration file for fixedpoint-control.
  *
  * Copy this file next to your project's include path and rename it to
  * `fpc_conf.h`.  Set the first `#if 0` to `#if 1` to enable its content,
