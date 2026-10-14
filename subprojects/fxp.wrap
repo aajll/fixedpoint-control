@@ -1,0 +1,8 @@
+[wrap-git]
+directory = fxp
+url = https://github.com/aajll/fxp.git
+revision = 24315b436e02f5b2b72f5fcd45944a410860343d
+depth = 1
+
+[provide]
+fxp = fxp_dep
