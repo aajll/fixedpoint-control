@@ -46,9 +46,9 @@ meson compile -C build_c2000
 - Validate pointer arguments at every public API boundary.
 - Public functions return `enum fpc_status`. Outputs are written through out-parameters so a valid `FPC_STATUS_OK` result is never ambiguous. No `errno`, no exceptions.
 
-## Compliance & Static Analysis
+## Static Analysis
 
-The library is designed with compliance in mind (e.g. IEC 61508). It is not formally certified. Contributors are encouraged to follow MISRA C:2023 guidelines to maintain the library's auditable nature. New deviations introduced in a PR should be called out in the description with a justification.
+Contributors are encouraged to follow MISRA C:2023 guidelines to maintain the library's auditable nature. New deviations introduced in a PR should be called out in the description with a justification.
 
 - Avoid pointer arithmetic where possible.
 - Ensure all loops have deterministic, compile-time or strictly bounded limits.

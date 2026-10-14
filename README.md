@@ -19,9 +19,8 @@ embedded systems.
   bounded, and all loops execute within known limits.
 - **PID runtime controls** — independent integral clamping, derivative
   smoothing, and manual/automatic mode switching.
-- **Compliance-aware design goals** — small auditable codebase with static
-  allocation, explicit contracts, and unit-test coverage. Formal compliance
-  evidence is not included in this repository.
+- **Auditable design** — small codebase with static allocation, explicit
+  contracts, and unit-test coverage.
 
 ## Installation
 
@@ -280,5 +279,4 @@ to be _exactly_ 8 bits, so it is not provided on the C2000).
 | **Manual mode**          | `fpc_pid_set_mode()` can hold a manual output and rebias the integral term when returning to auto mode.                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | **Derivative smoothing** | `d_filter_alpha` is a Q16.16 coefficient (stored as `uint32_t`). `FPC_PID_D_FILTER_ALPHA_MAX` (= `65536U`, the Q16.16 representation of `1.0`) disables smoothing; smaller values apply stronger low-pass filtering.                                                                                                                                                                                                                                                                                                                 |
 | **Caller ownership**     | Discard stale pointers after `*_deinit()`. Context pointers are invalid once returned to the pool.                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| **Compliance scope**     | The code is compliance-oriented, not certified. Formal MISRA/IEC-61508 evidence still requires project-specific analysis and lifecycle artifacts.                                                                                                                                                                                                                                                                                                                                                                                    |
 | **License**              | The repository is released under the MIT license in `LICENSE`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
