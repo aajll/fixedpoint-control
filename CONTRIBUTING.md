@@ -1,6 +1,6 @@
 # Contributing to fixedpoint-control
 
-fixedpoint-control is a safety-oriented fixed-point PID and filter library. It is designed for deterministic, static-memory execution in embedded environments.
+fixedpoint-control is a fixed-point PID and filter library built on the `fxp` arithmetic kernel. It is designed for deterministic execution in caller-owned memory on embedded targets.
 
 ## Getting started
 
@@ -13,12 +13,6 @@ meson setup build --buildtype=debug -Dbuild_tests=true \
 meson compile -C build
 meson test -C build --verbose
 
-# Override pool geometry
-meson setup build-custom -Dbuild_tests=true \
-                          -Dfpc_max_instances=16 -Dfpc_filter_max_order=128
-meson compile -C build-custom
-meson test -C build-custom --verbose
-
 # Warnings-as-errors build
 meson setup build-warn --buildtype=debug -Dbuild_tests=true -Dwerror=true
 meson compile -C build-warn
@@ -26,7 +20,7 @@ meson compile -C build-warn
 # TI C2000 cross build (library only) — requires a user-provided Meson
 # cross file describing your TI codegen install. Place it anywhere Meson
 # searches for cross files, or pass an absolute path with --cross-file=.
-# Not gated in CI (the GitHub Actions runner does not have the TI toolchain).
+# CI's c2000 job runs this build and writes a working cross file.
 meson setup build_c2000 --cross-file=ti-c2000.ini -Dbuild_tests=false
 meson compile -C build_c2000
 ```
@@ -46,6 +40,11 @@ meson compile -C build_c2000
 - Validate pointer arguments at every public API boundary.
 - Public functions return `enum fpc_status`. Outputs are written through out-parameters so a valid `FPC_STATUS_OK` result is never ambiguous. No `errno`, no exceptions.
 
+## Design decisions
+
+- **Storage** — instances are caller-owned structs, as in `rampg` and `debounce`. The library keeps no global state, so there is no capacity to configure, no allocator dependency and no handle that outlives its storage. Struct members are public only so callers can size them; treat them as private.
+- **Arithmetic** — all arithmetic goes through `fxp`. Sums accumulate in `fxp_acc_t` and narrow once through the build-wide rounding policy. Use the `_chk` or `_sat` forms wherever operand magnitudes are not bounded, and record the bound in a comment wherever an unchecked form is used.
+
 ## Static Analysis
 
 Contributors are encouraged to follow MISRA C:2023 guidelines to maintain the library's auditable nature. New deviations introduced in a PR should be called out in the description with a justification.
@@ -63,10 +62,12 @@ The same gates CI runs, in the same shape:
 cppcheck --enable=warning,style,performance,portability --error-exitcode=1 \
          --inline-suppr --std=c11 \
          --suppress=missingIncludeSystem --suppress=unusedFunction \
-         -I include -I subprojects/pool-allocator/include \
+         --suppress='*:subprojects/*' \
+         -I include -I subprojects/fxp/include \
          src/ include/
 
-# Memcheck (debug build with NO sanitisers)
+# Memcheck (debug build with NO sanitisers). On hosts whose dynamic loader
+# lacks symbols, add -Dc_link_args=-static so Valgrind can start.
 meson setup build_mem --buildtype=debug -Dbuild_tests=true
 meson compile -C build_mem
 meson test -C build_mem --verbose \
@@ -87,8 +88,9 @@ meson compile -C build_warn
 - Add a test for every new feature.
 - Tests are gated by `-Dbuild_tests=true` (default `false` for a clean library build). All tests must pass: `meson test -C build --verbose`.
 - New code must build and pass under ASan + UBSan (`-Db_sanitize=address,undefined`).
-- New code must also build under the TI C2000 cross configuration (library target only). The GitHub Actions runner does not have the TI toolchain, so this is a **local pre-submit** check — run it before opening a PR if your change touches `src/` or `include/`.
+- New code must also build under the TI C2000 cross configuration (library target only). CI's `c2000` job enforces this with warnings as errors on CGT 22.6.2 and 25.11.1.
 - Tests live in `tests/test_*.c`.
+- CI gates coverage at 100% of lines and branches in `src/`. Expected values in tests are exact integers derived from the arithmetic, with a comment wherever the derivation is not obvious.
 
 ## API Stability and Compatibility
 

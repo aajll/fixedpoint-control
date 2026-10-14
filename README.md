@@ -2,33 +2,21 @@
 
 [![CI](https://github.com/aajll/fixedpoint-control/actions/workflows/ci.yml/badge.svg)](https://github.com/aajll/fixedpoint-control/actions/workflows/ci.yml)
 
-Safety-oriented fixed-point PID controller and discrete filter library in C for
-embedded systems.
+Fixed-point PID controller and discrete filter library in C for embedded systems, built on the [fxp](https://github.com/aajll/fxp) arithmetic kernel.
 
 ## Features
 
-- **Static memory only** — opaque runtime contexts come from fixed-size pools;
-  no `malloc` / `free`.
-- **Coherent `fpc_*` API** — short, project-wide prefixes keep headers,
-  functions, macros, and generated files readable.
-- **Explicit status handling** — APIs return `enum fpc_status`; outputs are
-  written through out-parameters so a valid `0` result is never ambiguous.
-- **Fixed-point arithmetic** — PID, FIR, and biquad paths use `int32_t` data
-  with `int64_t` intermediates for deterministic embedded execution.
-- **Deterministic bounds** — pool capacity and FIR order are compile-time
-  bounded, and all loops execute within known limits.
-- **PID runtime controls** — independent integral clamping, derivative
-  smoothing, and manual/automatic mode switching.
-- **Auditable design** — small codebase with static allocation, explicit
-  contracts, and unit-test coverage.
+- **Caller-owned storage** — every PID, FIR and biquad instance is a struct the caller declares; the library has no global state and no heap allocation.
+- **Wide accumulation** — sums run in fxp's `fxp_acc_t` and narrow once per output, so sub-LSB contributions such as a slow integral are kept rather than truncated.
+- **Saturating arithmetic** — overflow saturates and is reported as `FPC_STATUS_SATURATED`; no path relies on signed overflow or right shifts of negative values.
+- **Explicit status handling** — APIs return `enum fpc_status`; outputs are written through out-parameters so a valid `0` result is never ambiguous.
+- **PID runtime controls** — anti-windup on the integral accumulator, derivative smoothing, and bumpless manual/automatic mode switching.
 
 ## Installation
 
 ### Meson subproject
 
-Add this repository as a subproject or wrap. The top-level project exports a
-dependency object with the correct include paths for the public headers and the
-generated configuration header.
+Add this repository as a subproject or wrap. The exported dependency carries the public headers and the fxp dependency, whose header is part of the API.
 
 ```meson
 fpc_dep = dependency(
@@ -39,8 +27,7 @@ fpc_dep = dependency(
 
 ### Installed dependency
 
-The project installs a static library, public headers, generated configuration
-headers, and a pkg-config file. After installation, consumers can use:
+The project installs a static library, its public headers and a pkg-config file:
 
 ```meson
 fpc_dep = dependency('fixedpoint-control')
@@ -50,90 +37,74 @@ fpc_dep = dependency('fixedpoint-control')
 
 - C11 compiler
 - Meson and Ninja
-- `pkg-config` for installed dependency discovery
-- Network access on first configure when Meson fetches the wrapped
-  `pool-allocator` dependency
+- Network access on first configure when Meson fetches the `fxp` wrap
 
-## Runtime Lifecycle
+## Number format
 
-- Call `fpc_pid_pool_init()` before creating PID controllers.
-- Call `fpc_filter_pool_init()` before creating FIR or biquad filters.
-- PID, FIR, and biquad objects use separate fixed-size pools.
-- `FPC_MAX_INSTANCES` applies per pool type, not as one shared global limit.
-- Pointers returned by `*_init()` become invalid after `*_deinit()`.
+Every signal, gain and coefficient is an `fxp_t`. The format and rounding policy are fxp's build-wide settings (`FXP_WORD_BITS`, `FXP_FRAC_BITS`, `FXP_ROUNDING`), which default to Q16.16 with round-to-nearest-even. Use fxp's constructors, such as `FXP_INT(3)` or `FXP_C(1, 5)`, to write values independently of the format.
 
 ## Quick Start
 
 ### PID controller
 
 ```c
-#include <stdint.h>
 #include "fpc_pid.h"
 
 int main(void)
 {
-        struct fpc_pid        *pid = NULL;
-        struct fpc_pid_config  cfg = {
-                .kp = 1000,
-                .ki = 500,
-                .kd = 200,
-                .dt = 1000,
-                .out_min = -100,
-                .out_max = 100,
-                .integral_min = -50,
-                .integral_max = 50,
-                .d_filter_alpha = FPC_PID_D_FILTER_ALPHA_MAX
+        static struct fpc_pid pid;
+        const struct fpc_pid_config cfg = {
+                .kp = FXP_C(1, 1),
+                .ki = FXP_C(1, 2),
+                .kd = FXP_C(1, 5),
+                .dt = FXP_C(1, 1),
+                .out_min = FXP_INT(-100),
+                .out_max = FXP_INT(100),
+                .integral_min = FXP_INT(-50),
+                .integral_max = FXP_INT(50),
+                .d_filter_alpha = FPC_PID_D_FILTER_ALPHA_MAX,
         };
-        int32_t                output = 0;
-
-        if (fpc_pid_pool_init() != FPC_STATUS_OK) {
-                return 1;
-        }
+        fxp_t output = 0;
 
         if (fpc_pid_init(&pid, &cfg) != FPC_STATUS_OK) {
                 return 1;
         }
-
-        if (fpc_pid_compute(pid, 1000, 900, &output) < FPC_STATUS_OK) {
-                (void)fpc_pid_deinit(pid);
+        if (fpc_pid_compute(&pid, FXP_INT(10), FXP_INT(9), &output)
+            < FPC_STATUS_OK) {
                 return 1;
         }
-
-        (void)fpc_pid_deinit(pid);
         return 0;
 }
 ```
 
+`dt` multiplies the integral gain and divides the derivative gain; the proportional term does not depend on it. Pick a time unit in which `dt` is exact, such as milliseconds for a 1 kHz loop. The integral is accumulated wide, so `integral_min` and `integral_max` clamp the accumulator itself and a reversal in error leaves the bound on the next step.
+
 ### FIR filter
 
+The coefficient and history arrays are borrowed: both hold `order` elements and must outlive the filter.
+
 ```c
-#include <stdint.h>
 #include "fpc_filters.h"
 
 int main(void)
 {
-        static const int32_t coeffs[] = {21845, 21845, 21845};
-        struct fpc_fir        *fir = NULL;
-        struct fpc_fir_config  cfg = {
+        static const fxp_t coeffs[3] = {FXP_C(1, 3), FXP_C(1, 3),
+                                        FXP_C(1, 3)};
+        static fxp_t history[3];
+        static struct fpc_fir fir;
+        const struct fpc_fir_config cfg = {
+                .coeffs = coeffs,
+                .history = history,
                 .order = 3U,
-                .coeffs = coeffs
         };
-        int32_t                output = 0;
-
-        if (fpc_filter_pool_init() != FPC_STATUS_OK) {
-                return 1;
-        }
+        fxp_t output = 0;
 
         if (fpc_fir_init(&fir, &cfg) != FPC_STATUS_OK) {
                 return 1;
         }
-
-        if (fpc_fir_process(fir, 1000, &output) != FPC_STATUS_OK) {
-                (void)fpc_fir_deinit(fir);
+        if (fpc_fir_process(&fir, FXP_INT(1), &output) < FPC_STATUS_OK) {
                 return 1;
         }
-
-        (void)fpc_fir_deinit(fir);
         return 0;
 }
 ```
@@ -141,94 +112,37 @@ int main(void)
 ### Biquad filter
 
 ```c
-#include <stdint.h>
 #include "fpc_filters.h"
 
 int main(void)
 {
-        struct fpc_biquad        *biquad = NULL;
-        struct fpc_biquad_config  cfg = {
-                .b0 = 65536,
+        static struct fpc_biquad bq;
+        const struct fpc_biquad_config cfg = {
+                .b0 = FXP_C(1, 1),
                 .b1 = 0,
                 .b2 = 0,
                 .a1 = 0,
-                .a2 = 0
+                .a2 = 0,
         };
-        int32_t                   output = 0;
+        fxp_t output = 0;
 
-        if (fpc_filter_pool_init() != FPC_STATUS_OK) {
+        if (fpc_biquad_init(&bq, &cfg) != FPC_STATUS_OK) {
                 return 1;
         }
-
-        if (fpc_biquad_init(&biquad, &cfg) != FPC_STATUS_OK) {
+        if (fpc_biquad_process(&bq, FXP_INT(1), &output) < FPC_STATUS_OK) {
                 return 1;
         }
-
-        if (fpc_biquad_process(biquad, 1000, &output) != FPC_STATUS_OK) {
-                (void)fpc_biquad_deinit(biquad);
-                return 1;
-        }
-
-        (void)fpc_biquad_deinit(biquad);
         return 0;
 }
 ```
 
-## Configuration
+## Lifecycle
 
-Configuration is resolved at compile time through a single header,
-`include/fpc_config.h`, which checks three sources in priority order:
-
-1. **`-DFPC_CONF_PATH="path/to/fpc_conf.h"`** — supply an explicit path on the
-   compiler command line.
-2. **`fpc_conf.h` on the include path** — place the file so
-   `#include "fpc_conf.h"` resolves (works with any build system or no build
-   system at all).
-3. **Built-in defaults** — if neither of the above is present, sensible defaults
-   are compiled in (see table below).
-
-Any value can also be overridden individually with a `-D` flag regardless of
-which source is used, because every define is `#ifndef`-guarded.
-
-### Configurable values
-
-| Macro                  | Description                                                                                                                                                                                                                                                                                   | Default |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| `FPC_MAX_INSTANCES`    | Slot count for each internal pool (PID, FIR, and biquad each get their own pool of this size).                                                                                                                                                                                                | `8`     |
-| `FPC_FILTER_MAX_ORDER` | Maximum FIR filter order (number of taps). Drives the pool slot size.                                                                                                                                                                                                                         | `64`    |
-| `FPC_POOL_ITEM_SIZE`   | Size of each pool slot. **Derived** from `FPC_FILTER_MAX_ORDER` via `ceil_to_align(8 + 8 * order, 16)`; equals `528` at the default order. Override only if a consumer-defined struct sharing the pool needs more space; the `_Static_assert` in the source files is the authoritative check. | derived |
-
-### Meson build options
-
-When building with Meson, options are set at configure time and the values are
-written into `builddir/fpc_conf.h` automatically; no manual header editing
-required. The Meson build derives the pool slot size from `fpc_filter_max_order`
-using the same formula as the C header, so there is no separate option for it.
-
-| Option                 | Description                                                         | Default |
-| ---------------------- | ------------------------------------------------------------------- | ------- |
-| `build_tests`          | Build and run the unit tests.                                       | `false` |
-| `fpc_max_instances`    | Maximum number of instances per internal pool.                      | `8`     |
-| `fpc_filter_max_order` | Maximum FIR filter order (taps). Drives the derived pool slot size. | `64`    |
-
-Downstream consumers using fpc as a Meson subproject can also forward
-arguments to the wrapped pool-allocator subproject via
-`-Dpool-allocator:<option>=<value>` (e.g. `-Dpool-allocator:atomicity_mode=volatile`).
-The pool's `auto` atomicity default already selects the correct mode based on
-target `CHAR_BIT`.
-
-### Drag-drop / no build system
-
-Copy `config/fpc_conf_template.h` to a location on your include path, rename it
-to `fpc_conf.h`, and change the first `#if 0` to `#if 1`. Then adjust the
-values to match your target.
-
-### Header layout
-
-- `config/fpc_conf_template.h` — copy-and-edit starting point for users
-- `config/fpc_conf.h.in` — Meson `configure_file()` template (do not edit)
-- `builddir/fpc_conf.h` — generated by Meson; not source-controlled
-- `include/fpc_config.h` — single public config header; include this in your code
+- `*_init()` validates a configuration and clears the instance state. On failure the instance is left uninitialised, and calls on it return `FPC_STATUS_NOT_INITIALIZED`.
+- A zero-initialised PID or FIR instance is uninitialised. A zero-initialised biquad is a valid filter whose output is always zero.
+- `*_set_config()` applies a new configuration at runtime; an invalid one leaves the instance unchanged.
+- `*_reset()` clears runtime state and keeps the configuration.
+- There is no teardown call: an instance owns no resources beyond its own storage.
 
 ## Building
 
@@ -242,40 +156,26 @@ meson setup build --buildtype=debug -Dbuild_tests=true
 meson compile -C build
 meson test -C build --verbose
 
-# Override pool geometry
-meson setup build-custom -Dbuild_tests=true \
-                          -Dfpc_max_instances=16 -Dfpc_filter_max_order=128
-
 # Install into a staging directory
 meson install -C build --destdir staging
 ```
 
 ## Platform Support
 
-The library auto-detects its addressing model from `<limits.h>` and works on
-any C11 toolchain whose `CHAR_BIT` is 8 or 16. There are no chip-specific code
-paths.
+The library works on any C11 toolchain whose `CHAR_BIT` is 8 or 16, with no chip-specific code paths.
 
-| Toolchain              | Target                       | Status                      |
-| ---------------------- | ---------------------------- | --------------------------- |
-| GCC, Clang             | x86_64 Linux                 | Host tests (CI)             |
-| GCC, Clang             | aarch64 Linux                | Compiles via cross          |
-| TI C2000 CGT 25.11 LTS | TI C2000 family (16-bit MAU) | Library cross-build (local) |
+| Toolchain                       | Target                | Status                   |
+| ------------------------------- | --------------------- | ------------------------ |
+| GCC, Clang                      | x86_64 Linux          | Host tests (CI)          |
+| GCC, Clang                      | aarch64 Linux         | Compiles via cross       |
+| TI C2000 CGT 22.6 and 25.11 LTS | 16-bit-MAU DSP family | Library cross-build (CI) |
 
-The TI C2000 cross-build is a **local pre-submit** check; the GitHub Actions
-runner does not have the TI toolchain. Internal scalar fields that need a
-byte-sized integer use `uint_least8_t` rather than `uint8_t` so the headers
-compile on targets where `CHAR_BIT == 16` (the C11 standard requires `uint8_t`
-to be _exactly_ 8 bits, so it is not provided on the C2000).
+CI cross-compiles the library and fxp with warnings as errors under both the COFF and EABI object formats. Byte-sized fields use `uint_least8_t` rather than `uint8_t`, which C11 does not provide when `CHAR_BIT == 16`.
 
 ## Notes
 
-| Topic                    | Note                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Version header**       | `fpc_version.h` is generated into the build directory from `config/fpc_version.h.in`. It should not be source-controlled.                                                                                                                                                                                                                                                                                                                                                                                                            |
-| **Build config header**  | `fpc_conf.h` is generated into the build directory from `config/fpc_conf.h.in`. It should not be source-controlled.                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| **Thread safety**        | fpc inherits pool-allocator's **single-writer / many-readers** contract. One context may call the mutating functions (`*_init`, `*_deinit`, `*_set_config`, `*_set_mode`, `*_reset`, `*_compute`, `*_process`) on a given instance; any number of contexts may call the read-only `*_get_config` / `*_get_state` concurrently. Two mutating contexts that share an instance must be serialised by the caller. The pool's per-slot status is `_Atomic` (or `volatile` on toolchains without `<stdatomic.h>`), selected automatically. |
-| **Manual mode**          | `fpc_pid_set_mode()` can hold a manual output and rebias the integral term when returning to auto mode.                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| **Derivative smoothing** | `d_filter_alpha` is a Q16.16 coefficient (stored as `uint32_t`). `FPC_PID_D_FILTER_ALPHA_MAX` (= `65536U`, the Q16.16 representation of `1.0`) disables smoothing; smaller values apply stronger low-pass filtering.                                                                                                                                                                                                                                                                                                                 |
-| **Caller ownership**     | Discard stale pointers after `*_deinit()`. Context pointers are invalid once returned to the pool.                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| **License**              | The repository is released under the MIT license in `LICENSE`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+- **Thread safety** — instances share no state, so different instances may be used from different contexts freely. Calls on one instance must be serialised by the caller, including the read-only `*_get_config()` and `*_get_state()`.
+- **Biquad feedback** — `a1` and `a2` must not be `FXP_MIN`, so that their negation is exact.
+- **FIR saturation** — the FIR sum saturates when the accumulator would overflow; once saturated, the result can depend on tap order.
+- **Version header** — `fpc_version.h` is generated into the build directory from `config/fpc_version.h.in` and is not source-controlled.
+- **Licence** — MIT, see `LICENSE`.
