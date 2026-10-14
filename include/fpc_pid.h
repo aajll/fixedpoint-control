@@ -6,41 +6,33 @@
  * @brief
  *    Safety-oriented fixed-point PID controller API.
  *
+ * Gains, signals, bounds and the sample period are @c fxp_t values. The
+ * integral is accumulated in a wide @c fxp_acc_t, so contributions smaller
+ * than one LSB per step are kept, and every result outside its range
+ * saturates and is reported.
+ *
+ * @par Storage
+ *    Controllers are caller-owned. Declare a @c struct fpc_pid with any
+ *    storage duration and pass its address to fpc_pid_init(). Its members are
+ *    private to the library.
+ *
  * @par Threading contract
- *    fpc inherits a **single-writer / many-readers** contract from its
- *    backing allocator. For a given controller instance:
- *      - One context may call the mutating functions: @c fpc_pid_init,
- *        @c fpc_pid_deinit, @c fpc_pid_reset, @c fpc_pid_set_config,
- *        @c fpc_pid_set_mode, @c fpc_pid_compute.
- *      - Any number of contexts may call the read-only @c fpc_pid_get_config
- *        and @c fpc_pid_get_state concurrently with the single writer.
- *      - Two mutating contexts that share an instance must be serialised
- *        by the caller.
+ *    A controller is not internally synchronised. Calls on the same instance
+ *    must be serialised by the caller; distinct instances are independent.
  */
 
 #ifndef FPC_PID_H_
 #define FPC_PID_H_
 
 #include "fpc_status.h"
+#include "fxp.h"
 #include <stdint.h>
 
-struct fpc_pid;
-
 /**
- * Maximum value `fpc_pid_config.d_filter_alpha` may take, and the value
- * that disables derivative smoothing. Numerically `65536` — i.e. the
- * Q16.16 representation of `1.0`. The field itself is `uint32_t`, so the
- * value fits with room to spare.
+ * Maximum value of @c fpc_pid_config.d_filter_alpha, and the value that
+ * disables derivative smoothing (1.0).
  */
-#define FPC_PID_D_FILTER_ALPHA_MAX (65536U)
-
-/**
- * @struct fpc_pid
- * @brief Opaque handle to a PID controller instance.
- *
- * This structure is managed by an internal allocator and should never be
- * accessed directly. It stores all state required for PID computation.
- */
+#define FPC_PID_D_FILTER_ALPHA_MAX FXP_ONE
 
 /**
  * @enum fpc_pid_mode
@@ -59,273 +51,181 @@ enum fpc_pid_mode {
  * @struct fpc_pid_config
  * @brief PID controller configuration.
  *
- * The controller implements the discrete PID algorithm:
+ * The controller implements the continuous law
  *
  * \f[
- * u(t) = K_p \cdot e(t) + K_i \cdot \sum{e(t)} + K_d \cdot \frac{d e(t)}{d t}
+ * u(t) = K_p e(t) + K_i \int e(t)\,dt + K_d \frac{de(t)}{dt}
  * \f]
  *
- * The implementation evaluates the proportional, integral, and derivative
- * terms as integer ratios over the configured sample time \f$ \Delta t \f$:
+ * discretised with sample period \f$ \Delta t \f$:
  *
  * \f[
- * u[k] = \frac{K_p}{\Delta t} \cdot e[k] + \frac{K_i}{\Delta t} \cdot
- * \sum_{i=0}^{k} e[i]
- *        + \frac{K_d}{\Delta t} \cdot (e[k] - e[k-1])
+ * u[k] = K_p e[k] + \sum_{i=0}^{k} (K_i \Delta t)\, e[i] + D[k]
  * \f]
  *
- * The derivative term uses exponential smoothing with coefficient \f$ \alpha
- * \f$:
+ * The derivative term is smoothed with coefficient \f$ \alpha \f$:
  *
  * \f[
- * D[k] = D[k-1] + \frac{\alpha}{65536} \cdot \left(D_{raw}[k] - D[k-1]\right)
+ * D[k] = D[k-1] + \alpha \left(\frac{K_d}{\Delta t}(e[k] - e[k-1])
+ *        - D[k-1]\right)
  * \f]
  *
- * where \f$ D_{raw}[k] = \frac{K_d}{\Delta t} \cdot (e[k] - e[k-1]) \f$ and
- * \f$ \alpha \in [0, 65536] \f$ is a Q16.16 smoothing coefficient.
+ * The discrete gains \f$ K_i \Delta t \f$ and \f$ K_d / \Delta t \f$ are
+ * derived once when a configuration is applied. @c dt is in the time unit of
+ * @c ki and @c kd; choose a unit in which @c dt is exactly representable, such
+ * as milliseconds for a 1 kHz loop (@c dt = 1.0, @c ki in 1/ms).
  *
- * @note `kp`, `ki`, `kd`, the integral term, the filtered derivative, and the
- *       output are stored as signed `int32_t` controller units. Only
- *       `d_filter_alpha` is expressed in Q16.16.
- * @note `d_filter_alpha = 65536U` disables smoothing; smaller values apply
- *       stronger low-pass filtering.
+ * @details
+ *   - ::kp  proportional gain.
+ *   - ::ki  integral gain, per unit of @c dt time.
+ *   - ::kd  derivative gain, in units of @c dt time.
+ *   - ::dt  sample period; must be positive.
+ *   - ::out_min, ::out_max  inclusive output bounds.
+ *   - ::integral_min, ::integral_max  inclusive bounds on the integral term,
+ *     applied to the wide accumulator (anti-windup).
+ *   - ::d_filter_alpha  derivative smoothing coefficient in
+ *     [0, @ref FPC_PID_D_FILTER_ALPHA_MAX]; the maximum disables smoothing.
  *
- * @post Configuration validation ensures:
- *   - dt > 0 (positive sample time)
- *   - out_min <= out_max (valid output range)
- *   - integral_min <= integral_max (valid integral bounds)
- *   - d_filter_alpha <= 65536 (valid smoothing coefficient)
+ * A configuration is rejected when @c dt is not positive, a lower bound
+ * exceeds its upper bound, @c d_filter_alpha is out of range, or a derived
+ * gain saturates or rounds to zero from a nonzero gain.
  */
 struct fpc_pid_config {
-        int32_t kp; /**< Proportional gain numerator divided by dt at runtime */
-        int32_t ki; /**< Integral gain numerator divided by dt at runtime */
-        int32_t kd; /**< Derivative gain numerator divided by dt at runtime */
-        int32_t dt; /**< Sample time in ticks (must be > 0) */
-        int32_t out_min;         /**< Minimum output clamp (inclusive) */
-        int32_t out_max;         /**< Maximum output clamp (inclusive) */
-        int32_t integral_min;    /**< Minimum integral term (inclusive) */
-        int32_t integral_max;    /**< Maximum integral term (inclusive) */
-        uint32_t d_filter_alpha; /**< Derivative smoothing coefficient (Q16.16,
-                                    0-65536) */
+        fxp_t kp;
+        fxp_t ki;
+        fxp_t kd;
+        fxp_t dt;
+        fxp_t out_min;
+        fxp_t out_max;
+        fxp_t integral_min;
+        fxp_t integral_max;
+        fxp_t d_filter_alpha;
+};
+
+/**
+ * @struct fpc_pid
+ * @brief Caller-owned PID controller instance. Members are private.
+ */
+struct fpc_pid {
+        struct fpc_pid_config cfg; /**< @private Applied configuration. */
+        fxp_t ki_dt;               /**< @private ki * dt */
+        fxp_t kd_dt;               /**< @private kd / dt */
+        fxp_acc_t integral;        /**< @private Integral accumulator. */
+        fxp_t prev_error;          /**< @private e[k-1] */
+        fxp_t filtered_derivative; /**< @private D[k] */
+        fxp_t last_output;         /**< @private u[k] */
+        fxp_t manual_output;       /**< @private Manual-mode output. */
+        uint_least8_t mode;        /**< @private enum fpc_pid_mode */
 };
 
 /**
  * @struct fpc_pid_state
  * @brief Runtime PID state for diagnostics and tuning.
- *
- * This structure provides access to internal controller state for:
- *   - Online tuning adjustments
- *   - Controller performance monitoring
- *   - Mode transition handling
- *
- * @note The state values are raw controller units returned by the runtime
- *       implementation; they are not Q16.16-encoded values.
  */
 struct fpc_pid_state {
-        int32_t integral;            /**< Current integral term */
-        int32_t prev_error;          /**< Previous error value e[k-1] */
-        int32_t filtered_derivative; /**< Smoothed derivative term D[k] */
-        int32_t last_output;         /**< Last computed output u[k] */
-        enum fpc_pid_mode mode;      /**< Current operating mode */
+        fxp_t integral;            /**< Integral term, rounded to fxp_t. */
+        fxp_t prev_error;          /**< Previous error e[k-1]. */
+        fxp_t filtered_derivative; /**< Smoothed derivative term D[k]. */
+        fxp_t last_output;         /**< Last output u[k]. */
+        enum fpc_pid_mode mode;    /**< Current operating mode. */
 };
 
 /**
- * @brief Initialize the PID controller pool.
- *
- * @return enum fpc_status Status code indicating success or failure.
- *
- * @pre No pre-initialization required.
- * @post The pool allocator is initialized and ready for fpc_pid_init() calls.
- * @note Must be called before any PID controller instances can be created.
- * @see fpc_pid_init()
- */
-enum fpc_status fpc_pid_pool_init(void);
-
-/**
- * @brief Create and initialize a new PID controller instance.
- *
- * @param ctx Pointer to store the controller handle (output).
- * @param cfg Configuration structure with controller gains and bounds.
- *
- * @return enum fpc_status Status code indicating success or failure.
+ * @brief Initialise a PID controller in auto mode with cleared state.
  *
  * @retval FPC_STATUS_OK on success.
- * @retval FPC_STATUS_NULL_PTR if ctx is NULL.
- * @retval FPC_STATUS_INVALID_PARAM if cfg contains invalid parameters.
- * @retval FPC_STATUS_NOT_INITIALIZED if pool initialization failed.
- * @retval FPC_STATUS_POOL_FULL if no free controller slots available.
- *
- * @pre fpc_pid_pool_init() must have been called successfully.
- * @post *ctx is set to a valid controller handle on success.
- * @post Controller is in AUTO mode with integral term initialized to zero.
- * @note The controller inherits configuration immediately; changes to cfg
- *       after return do not affect the controller.
+ * @retval FPC_STATUS_NULL_PTR if @p pid is NULL.
+ * @retval FPC_STATUS_INVALID_PARAM if @p cfg is NULL or invalid (see
+ *         @ref fpc_pid_config). @p pid is left uninitialised.
  */
-enum fpc_status fpc_pid_init(struct fpc_pid **ctx,
+enum fpc_status fpc_pid_init(struct fpc_pid *pid,
                              const struct fpc_pid_config *cfg);
 
 /**
- * @brief Deinitialize a PID controller instance and return it to the pool.
+ * @brief Clear the integral, derivative and error history.
  *
- * @param ctx Controller handle to deinitialize.
- *
- * @return enum fpc_status Status code indicating success or failure.
+ * The last output becomes the manual output in manual mode, and 0 otherwise.
  *
  * @retval FPC_STATUS_OK on success.
- * @retval FPC_STATUS_NULL_PTR if ctx is NULL.
- * @retval FPC_STATUS_NOT_INITIALIZED if ctx is not a valid initialized
- * controller.
- *
- * @pre fpc_pid_init() must have been called with ctx.
- * @post ctx is no longer valid and cannot be used after return.
- * @note The controller state is released back to the pool.
+ * @retval FPC_STATUS_NULL_PTR if @p pid is NULL.
+ * @retval FPC_STATUS_NOT_INITIALIZED if @p pid has not been initialised.
  */
-enum fpc_status fpc_pid_deinit(struct fpc_pid *ctx);
+enum fpc_status fpc_pid_reset(struct fpc_pid *pid);
 
 /**
- * @brief Reset a PID controller to its initial state.
+ * @brief Apply a new configuration, keeping runtime state.
  *
- * @param ctx Controller handle to reset.
- *
- * @return enum fpc_status Status code indicating success or failure.
+ * The integral, last output and manual output are clamped to the new bounds.
  *
  * @retval FPC_STATUS_OK on success.
- * @retval FPC_STATUS_NULL_PTR if ctx is NULL.
- * @retval FPC_STATUS_NOT_INITIALIZED if ctx is not a valid initialized
- * controller.
- *
- * @pre fpc_pid_init() must have been called with ctx.
- * @post The integral term, previous error, and filtered derivative are zeroed.
- * @post If in MANUAL mode, last_output retains the manual value.
- * @post If in AUTO mode, last_output is set to zero.
+ * @retval FPC_STATUS_SATURATED if any state was clamped.
+ * @retval FPC_STATUS_NULL_PTR if @p pid is NULL.
+ * @retval FPC_STATUS_NOT_INITIALIZED if @p pid has not been initialised.
+ * @retval FPC_STATUS_INVALID_PARAM if @p cfg is NULL or invalid; the
+ *         controller is unchanged.
  */
-enum fpc_status fpc_pid_reset(struct fpc_pid *ctx);
-
-/**
- * @brief Update a PID controller's configuration parameters.
- *
- * @param ctx Controller handle to update.
- * @param cfg New configuration structure.
- *
- * @return enum fpc_status Status code indicating success or failure.
- *
- * @retval FPC_STATUS_OK on success.
- * @retval FPC_STATUS_NULL_PTR if ctx is NULL.
- * @retval FPC_STATUS_INVALID_PARAM if cfg is NULL or contains invalid
- * parameters.
- * @retval FPC_STATUS_NOT_INITIALIZED if ctx is not a valid initialized
- * controller.
- * @retval FPC_STATUS_SATURATED if internal state was clamped.
- *
- * @pre fpc_pid_init() must have been called with ctx.
- * @post All configuration parameters are updated atomically.
- * @post Integral term is clamped to integral_min..integral_max if out of
- * bounds.
- * @post last_output is clamped to out_min..out_max if out of bounds.
- * @note The controller does not reset on configuration change; state persists.
- */
-enum fpc_status fpc_pid_set_config(struct fpc_pid *ctx,
+enum fpc_status fpc_pid_set_config(struct fpc_pid *pid,
                                    const struct fpc_pid_config *cfg);
 
 /**
- * @brief Copy a PID controller's current configuration.
- *
- * @param ctx Controller handle to read.
- * @param cfg Buffer to store configuration (output).
- *
- * @return enum fpc_status Status code indicating success or failure.
+ * @brief Read the applied configuration.
  *
  * @retval FPC_STATUS_OK on success.
- * @retval FPC_STATUS_NULL_PTR if ctx or cfg is NULL.
- * @retval FPC_STATUS_NOT_INITIALIZED if ctx is not a valid initialized
- * controller.
- *
- * @pre fpc_pid_init() must have been called with ctx.
- * @post *cfg contains a snapshot of the current configuration.
- * @note Reflects any configuration changes made via fpc_pid_set_config().
+ * @retval FPC_STATUS_NULL_PTR if @p pid or @p cfg is NULL.
+ * @retval FPC_STATUS_NOT_INITIALIZED if @p pid has not been initialised.
  */
-enum fpc_status fpc_pid_get_config(const struct fpc_pid *ctx,
+enum fpc_status fpc_pid_get_config(const struct fpc_pid *pid,
                                    struct fpc_pid_config *cfg);
 
 /**
- * @brief Change PID controller operating mode.
+ * @brief Switch between auto and manual mode.
  *
- * @param ctx Controller handle to update.
- * @param mode Desired operating mode (AUTO or MANUAL).
- * @param manual_output Output value to use in MANUAL mode.
+ * Entering manual mode holds @p manual_output, clamped to the output bounds.
+ * Returning to auto mode re-biases the integral so that the next output, for
+ * an unchanged error, equals the last output (bumpless transfer).
  *
- * @return enum fpc_status Status code indicating success or failure.
- *
- * @retval FPC_STATUS_OK on success.
- * @retval FPC_STATUS_NULL_PTR if ctx is NULL.
- * @retval FPC_STATUS_INVALID_PARAM if mode is invalid.
- * @retval FPC_STATUS_NOT_INITIALIZED if ctx is not a valid initialized
- * controller.
- * @retval FPC_STATUS_SATURATED if manual_output was clamped to
- * out_min..out_max.
- *
- * @pre fpc_pid_init() must have been called with ctx.
- * @post When switching from MANUAL to AUTO, the integral term is rebalanced
- *       to maintain output continuity (anti-windup).
- * @post When switching to MANUAL, last_output is set to the clamped
- * manual_output value.
- * @post When switching to AUTO, the integral term is adjusted to account for
- *       the proportional and derivative contributions to the current output.
- */
-enum fpc_status fpc_pid_set_mode(struct fpc_pid *ctx, enum fpc_pid_mode mode,
-                                 int32_t manual_output);
-
-/**
- * @brief Compute the PID output for a given setpoint and measurement.
- *
- * @param ctx Controller handle to use for computation.
- * @param setpoint Target value (setpoint).
- * @param measurement Current process value (measurement).
- * @param output Computed control output (output).
- *
- * @return enum fpc_status Status code indicating success or failure.
- *
- * @retval FPC_STATUS_OK on success with no clamping.
- * @retval FPC_STATUS_NULL_PTR if ctx or output is NULL.
- * @retval FPC_STATUS_NOT_INITIALIZED if ctx is not a valid initialized
- * controller.
- * @retval FPC_STATUS_OVERFLOW if an intermediate value cannot be represented as
- * int32_t.
- * @retval FPC_STATUS_SATURATED if output or integral term was clamped.
- *
- * @pre fpc_pid_init() must have been called with ctx.
- * @post On `FPC_STATUS_OK` or `FPC_STATUS_SATURATED`, *output contains the
- *       computed PID value clamped to out_min..out_max.
- * @post In AUTO mode with no overflow: computes full PID with proportional,
- *       integral, and derivative terms and updates the controller state.
- * @post In MANUAL mode: returns last_output without computation, updates
- * prev_error, and clears the filtered derivative state.
- * @note Error is computed as: error = setpoint - measurement
- * @note If overflow is detected, the controller holds the previous output and
- *       returns FPC_STATUS_OVERFLOW.
- */
-enum fpc_status fpc_pid_compute(struct fpc_pid *ctx, int32_t setpoint,
-                                int32_t measurement, int32_t *output);
-
-/**
- * @brief Retrieve the current runtime state of a PID controller.
- *
- * @param ctx Controller handle to read.
- * @param state Buffer to store controller state (output).
- *
- * @return enum fpc_status Status code indicating success or failure.
+ * @param pid Controller instance.
+ * @param mode Requested mode.
+ * @param manual_output Output to hold in manual mode; ignored for auto mode.
  *
  * @retval FPC_STATUS_OK on success.
- * @retval FPC_STATUS_NULL_PTR if ctx or state is NULL.
- * @retval FPC_STATUS_NOT_INITIALIZED if ctx is not a valid initialized
- * controller.
- *
- * @pre fpc_pid_init() must have been called with ctx.
- * @post *state contains a snapshot of the current internal state.
- * @note This function is useful for diagnostics, logging, and mode transition
- * logic.
+ * @retval FPC_STATUS_SATURATED if the manual output or the re-biased integral
+ *         was clamped.
+ * @retval FPC_STATUS_NULL_PTR if @p pid is NULL.
+ * @retval FPC_STATUS_NOT_INITIALIZED if @p pid has not been initialised.
+ * @retval FPC_STATUS_INVALID_PARAM if @p mode is not a valid mode.
  */
-enum fpc_status fpc_pid_get_state(const struct fpc_pid *ctx,
+enum fpc_status fpc_pid_set_mode(struct fpc_pid *pid, enum fpc_pid_mode mode,
+                                 fxp_t manual_output);
+
+/**
+ * @brief Run one controller step.
+ *
+ * In manual mode, records the error and returns the held output.
+ *
+ * @param pid Controller instance.
+ * @param setpoint Desired value.
+ * @param measurement Measured value.
+ * @param[out] output Controller output u[k].
+ *
+ * @retval FPC_STATUS_OK on success.
+ * @retval FPC_STATUS_SATURATED if the error, the error change, the raw
+ *         derivative, the integral or the output was clamped; @p output
+ *         holds the clamped result.
+ * @retval FPC_STATUS_NULL_PTR if @p pid or @p output is NULL.
+ * @retval FPC_STATUS_NOT_INITIALIZED if @p pid has not been initialised.
+ */
+enum fpc_status fpc_pid_compute(struct fpc_pid *pid, fxp_t setpoint,
+                                fxp_t measurement, fxp_t *output);
+
+/**
+ * @brief Read the runtime state.
+ *
+ * @retval FPC_STATUS_OK on success.
+ * @retval FPC_STATUS_NULL_PTR if @p pid or @p state is NULL.
+ * @retval FPC_STATUS_NOT_INITIALIZED if @p pid has not been initialised.
+ */
+enum fpc_status fpc_pid_get_state(const struct fpc_pid *pid,
                                   struct fpc_pid_state *state);
 
 #endif /* FPC_PID_H_ */
