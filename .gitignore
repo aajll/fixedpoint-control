@@ -50,5 +50,6 @@ builddir/
 
 # Meson subproject generated state
 subprojects/pool-allocator/
+subprojects/fxp/
 subprojects/packagecache/
 subprojects/*.wraplock

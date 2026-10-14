@@ -47,9 +47,20 @@ pool_subproj = subproject(
 pool_lib = pool_subproj.get_variable('pool_lib')
 pool_dep = declare_dependency(include_directories: pool_subproj.get_variable('public_headers'))
 
+# Fixed-point arithmetic kernel. Its public header is part of the fpc API, so
+# fpc_dep carries it to consumers.
+fxp_dep = dependency(
+  'fxp',
+  default_options: ['build_tests=false', 'with_convert=false'],
+)
+
 subdir('src')
 
-fpc_dep = declare_dependency(link_with: lib, include_directories: inc)
+fpc_dep = declare_dependency(
+  link_with: lib,
+  include_directories: inc,
+  dependencies: fxp_dep,
+)
 
 meson.override_dependency('fixedpoint-control', fpc_dep)
 
