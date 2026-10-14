@@ -8,17 +8,11 @@ on:
 
 jobs:
   # ---------------------------------------------------------------------------
-  # Build the library and run the full test suite under ASan + UBSan across
-  # every fpc_filter_max_order.
+  # Build the library and run the full test suite under ASan + UBSan.
   # ---------------------------------------------------------------------------
   test:
-    name: "Test (order=${{ matrix.fpc_filter_max_order }})"
+    name: "Test"
     runs-on: ubuntu-latest
-
-    strategy:
-      fail-fast: false
-      matrix:
-        fpc_filter_max_order: [64, 128]
 
     steps:
       - uses: actions/checkout@v4
@@ -39,7 +33,6 @@ jobs:
           --buildtype=debug
           -Dbuild_tests=true
           -Db_sanitize=address,undefined
-          -Dfpc_filter_max_order=${{ matrix.fpc_filter_max_order }}
 
       - name: Build
         run: meson compile -C build
@@ -51,23 +44,17 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: testlog-order${{ matrix.fpc_filter_max_order }}
+          name: testlog
           path: build/meson-logs/testlog.txt
 
   # ---------------------------------------------------------------------------
-  # Release build matrix — the configuration a downstream project would use.
-  # No sanitizers, no tests; just verify the library compiles cleanly across
-  # the same axes.
+  # Release build: the configuration a downstream project would use. No
+  # sanitizers, no tests; just verify the library compiles cleanly.
   # ---------------------------------------------------------------------------
   release-build:
-    name: "Release (order=${{ matrix.fpc_filter_max_order }})"
+    name: "Release"
     runs-on: ubuntu-latest
     needs: test
-
-    strategy:
-      fail-fast: false
-      matrix:
-        fpc_filter_max_order: [64, 128]
 
     steps:
       - uses: actions/checkout@v4
@@ -87,7 +74,6 @@ jobs:
           meson setup build
           --buildtype=release
           -Dbuild_tests=false
-          -Dfpc_filter_max_order=${{ matrix.fpc_filter_max_order }}
 
       - name: Build
         run: meson compile -C build
@@ -140,8 +126,8 @@ jobs:
       - name: Install cppcheck
         run: sudo apt-get update -q && sudo apt-get install -y cppcheck
 
-      # cppcheck needs to see the pool-allocator and fxp headers since they
-      # appear in fpc's source. Fetch the wraps so the include paths resolve.
+      # cppcheck needs to see the fxp headers since they appear in fpc's
+      # public API. Fetch the wrap so the include path resolves.
       - uses: actions/setup-python@v5
         with:
           python-version: "3.x"
@@ -152,16 +138,9 @@ jobs:
           pip install meson
 
       - name: Resolve subproject wraps
-        run: meson subprojects download pool-allocator fxp
+        run: meson subprojects download fxp
 
       - name: Run cppcheck
-        # `preprocessorErrorDirective` is suppressed at the file level for
-        # include/fpc_config.h: cppcheck explores both branches of the
-        # `#if defined(FPC_CONF_PATH)` guard and flags the `#include
-        # FPC_CONF_PATH` line as empty when the macro is undefined. The
-        # inline `cppcheck-suppress` in the header documents the intent;
-        # this CLI suppression is belt-and-braces in case the inline form
-        # is not honoured by older cppcheck versions on the runner.
         run: >
           cppcheck
           --enable=warning,style,performance,portability
@@ -170,10 +149,8 @@ jobs:
           --std=c11
           --suppress=missingIncludeSystem
           --suppress=unusedFunction
-          --suppress=preprocessorErrorDirective:include/fpc_config.h
           --suppress=*:subprojects/*
           -I include
-          -I subprojects/pool-allocator/include
           -I subprojects/fxp/include
           src/ include/
 
@@ -269,8 +246,8 @@ jobs:
             --html-details coverage-report/index.html \
             --txt coverage-report/summary.txt \
             --print-summary \
-            --fail-under-line 80 \
-            --fail-under-branch 70
+            --fail-under-line 100 \
+            --fail-under-branch 100
 
       - name: Upload coverage report
         if: always()
