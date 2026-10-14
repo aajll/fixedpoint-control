@@ -5,7 +5,7 @@
 ## 1) Project-specific instructions
 
 **Project:** `fixedpoint-control`
-**Primary goal:** Safety-oriented fixed-point PID controller and discrete filter (FIR / biquad) library for embedded systems — static memory only, no heap allocation.
+**Primary goal:** Fixed-point PID controller and discrete filter (FIR / biquad) library for embedded systems, built on `fxp`, with caller-owned instances and no heap allocation.
 
 ### 1.1 Essential commands
 
@@ -16,13 +16,6 @@ meson setup build --wipe --buildtype=debug -Dbuild_tests=true \
                   -Db_sanitize=address,undefined
 meson compile -C build
 meson test -C build --verbose
-```
-
-#### Override pool geometry
-
-```sh
-meson setup build-custom --wipe -Dbuild_tests=true \
-                          -Dfpc_max_instances=16 -Dfpc_filter_max_order=128
 ```
 
 #### Warnings-as-errors build
@@ -39,10 +32,12 @@ meson compile -C build-warn
 cppcheck --enable=warning,style,performance,portability --error-exitcode=1 \
          --inline-suppr --std=c11 \
          --suppress=missingIncludeSystem --suppress=unusedFunction \
-         -I include -I subprojects/pool-allocator/include \
+         --suppress='*:subprojects/*' \
+         -I include -I subprojects/fxp/include \
          src/ include/
 
-# Valgrind memcheck — build WITHOUT sanitisers, then wrap the test run
+# Valgrind memcheck — build WITHOUT sanitisers, then wrap the test run.
+# Add -Dc_link_args=-static if the host's dynamic loader lacks symbols.
 meson setup build_mem --wipe --buildtype=debug -Dbuild_tests=true
 meson compile -C build_mem
 meson test -C build_mem --verbose \
@@ -58,13 +53,13 @@ meson setup build_c2000 --wipe --cross-file=ti-c2000.ini -Dbuild_tests=false
 meson compile -C build_c2000
 ```
 
-The cross file is user-provided. Not gated in CI (no TI toolchain on the runner).
+The cross file is user-provided; the `c2000` job in `.github/workflows/ci.yml` writes a working one. CI runs this build with `-Dwerror=true` on CGT 22.6.2 and 25.11.1, under `--abi=coffabi` and `--abi=eabi`.
 
 #### Notes
 
-- `meson setup` generates `fpc_version.h` and `fpc_conf.h` into the **build directory**
+- `meson setup` generates `fpc_version.h` into the **build directory**
 - Tests are gated by `-Dbuild_tests=true`; default is `false` for a clean library build
-- Pool allocator subproject (`pool-allocator`) is fetched automatically on first configure
+- The `fxp` subproject is fetched automatically on first configure, pinned by commit in `subprojects/fxp.wrap`
 
 ---
 
