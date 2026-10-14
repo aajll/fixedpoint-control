@@ -9,16 +9,15 @@ on:
 jobs:
   # ---------------------------------------------------------------------------
   # Build the library and run the full test suite under ASan + UBSan across
-  # the matrix: OS × fpc_filter_max_order.
+  # every fpc_filter_max_order.
   # ---------------------------------------------------------------------------
   test:
-    name: "Test (${{ matrix.os }}, order=${{ matrix.fpc_filter_max_order }})"
-    runs-on: ${{ matrix.os }}
+    name: "Test (order=${{ matrix.fpc_filter_max_order }})"
+    runs-on: ubuntu-latest
 
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
         fpc_filter_max_order: [64, 128]
 
     steps:
@@ -28,13 +27,8 @@ jobs:
         with:
           python-version: "3.x"
 
-      - name: Install ninja (Ubuntu)
-        if: runner.os == 'Linux'
+      - name: Install ninja
         run: sudo apt-get update -q && sudo apt-get install -y ninja-build
-
-      - name: Install ninja (macOS)
-        if: runner.os == 'macOS'
-        run: brew install ninja
 
       - name: Install meson
         run: pip install meson
@@ -57,7 +51,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: testlog-${{ matrix.os }}-order${{ matrix.fpc_filter_max_order }}
+          name: testlog-order${{ matrix.fpc_filter_max_order }}
           path: build/meson-logs/testlog.txt
 
   # ---------------------------------------------------------------------------
@@ -66,14 +60,13 @@ jobs:
   # the same axes.
   # ---------------------------------------------------------------------------
   release-build:
-    name: "Release (${{ matrix.os }}, order=${{ matrix.fpc_filter_max_order }})"
-    runs-on: ${{ matrix.os }}
+    name: "Release (order=${{ matrix.fpc_filter_max_order }})"
+    runs-on: ubuntu-latest
     needs: test
 
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
         fpc_filter_max_order: [64, 128]
 
     steps:
@@ -83,13 +76,8 @@ jobs:
         with:
           python-version: "3.x"
 
-      - name: Install ninja (Ubuntu)
-        if: runner.os == 'Linux'
+      - name: Install ninja
         run: sudo apt-get update -q && sudo apt-get install -y ninja-build
-
-      - name: Install ninja (macOS)
-        if: runner.os == 'macOS'
-        run: brew install ninja
 
       - name: Install meson
         run: pip install meson

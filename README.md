@@ -259,7 +259,6 @@ paths.
 | Toolchain              | Target                       | Status                      |
 | ---------------------- | ---------------------------- | --------------------------- |
 | GCC, Clang             | x86_64 Linux                 | Host tests (CI)             |
-| GCC, Clang             | x86_64 macOS                 | Host tests (CI)             |
 | GCC, Clang             | aarch64 Linux                | Compiles via cross          |
 | TI C2000 CGT 25.11 LTS | TI C2000 family (16-bit MAU) | Library cross-build (local) |
 
