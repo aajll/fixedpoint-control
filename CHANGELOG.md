@@ -8,9 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Versioning restarts in the 0.x series while the API is under active development: the 1.2.2 and 1.3.2 releases are re-published as 0.2.2 and 0.3.2 on the same commits, and minor releases may contain breaking changes until 1.0.0.
 - Added security policy, SPDX headers, cleaned ignore rules, explicit `warning_level=3`, and a standard coverage gate while preserving the existing pool-allocator integration.
 
-## [1.3.2] - 2026-05-29
+## [0.3.2] - 2026-05-29
 
 ### Added
 
@@ -24,7 +25,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Ensured CI enables tests explicitly instead of letting `meson test` pass vacuously when `build_tests` is disabled.
 
-## [1.2.2] - 2026-04-29
+## [0.2.2] - 2026-04-29
 
 ### Added
 
