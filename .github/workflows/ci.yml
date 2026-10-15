@@ -168,7 +168,7 @@ jobs:
 
       - name: Test under Valgrind
         run: >
-          meson test -C build --verbose
+          meson test -C build --verbose --no-suite docs
           --wrapper='valgrind --error-exitcode=1 --leak-check=full
           --show-leak-kinds=all --track-origins=yes --errors-for-leak-kinds=all'
 

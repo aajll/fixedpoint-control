@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- `docs/integration.md`, `docs/api.md` and `docs/design.md`, covering installation and the number format, the API, the discrete control law and its overflow bounds, the modes, the filter forms, the footprint, failure behaviour, the MISRA baseline and verification. The README is now a short landing page with a quick start whose output is checked, and a `fixedpoint-control docs examples` test compiles every C block in the README, `CONTRIBUTING.md` and `docs/`.
+
 ### Changed
 
 - Versioning restarts in the 0.x series while the API is under active development: the 1.2.2 and 1.3.2 releases are re-published as 0.2.2 and 0.3.2 on the same commits, and minor releases may contain breaking changes until 1.0.0.
