@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # === Build personality ========================================================
 # By default we disable tests. These can be enabled by passing
 # -Dbuild_tests=true to meson.

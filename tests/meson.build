@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 if get_option('build_tests')
   test_exe = executable(
     'test_fpc',

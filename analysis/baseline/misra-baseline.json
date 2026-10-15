@@ -1,0 +1,47 @@
+{
+  "schema": "misch/baseline@2",
+  "fingerprints": {
+    "71465db28882": {
+      "rule_id": "misra-c2012-8.7",
+      "file": "src/filters.c",
+      "message": "misra violation (use --rule-texts=<file> to get proper output)",
+      "count": 8
+    },
+    "77e408f9d667": {
+      "rule_id": "misra-c2012-15.5",
+      "file": "src/filters.c",
+      "message": "misra violation (use --rule-texts=<file> to get proper output)",
+      "count": 15
+    },
+    "88aa0f57a626": {
+      "rule_id": "misra-c2012-8.7",
+      "file": "src/pid_controller.c",
+      "message": "misra violation (use --rule-texts=<file> to get proper output)",
+      "count": 7
+    },
+    "b037a50f9f80": {
+      "rule_id": "misra-c2012-10.1",
+      "file": "src/filters.c",
+      "message": "misra violation (use --rule-texts=<file> to get proper output)",
+      "count": 2
+    },
+    "c0de2bd19127": {
+      "rule_id": "misra-c2012-17.8",
+      "file": "src/filters.c",
+      "message": "misra violation (use --rule-texts=<file> to get proper output)",
+      "count": 1
+    },
+    "e72fe991dd67": {
+      "rule_id": "misra-c2012-15.5",
+      "file": "src/pid_controller.c",
+      "message": "misra violation (use --rule-texts=<file> to get proper output)",
+      "count": 19
+    },
+    "f1911c00950b": {
+      "rule_id": "misra-c2012-10.1",
+      "file": "src/pid_controller.c",
+      "message": "misra violation (use --rule-texts=<file> to get proper output)",
+      "count": 3
+    }
+  }
+}

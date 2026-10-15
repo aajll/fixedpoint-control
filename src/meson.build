@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 src_files = files('pid_controller.c', 'filters.c')
 
 # Build as static library for testing

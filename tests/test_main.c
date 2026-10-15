@@ -1,4 +1,6 @@
 /*
+ * SPDX-License-Identifier: MIT
+ *
  * @file: test_main.c
  * @brief Unified unit-test driver for the fixedpoint-control library.
  */

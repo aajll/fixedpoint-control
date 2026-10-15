@@ -25,7 +25,7 @@ meson setup build-warn --wipe --buildtype=debug -Dbuild_tests=true -Dwerror=true
 meson compile -C build-warn
 ```
 
-#### Static analysis (cppcheck) and memory check (Valgrind)
+#### Static analysis, memory check, MISRA and formatting
 
 ```sh
 # cppcheck (CI gate)
@@ -44,6 +44,13 @@ meson test -C build_mem --verbose \
   --wrapper='valgrind --error-exitcode=1 --leak-check=full \
              --show-leak-kinds=all --track-origins=yes \
              --errors-for-leak-kinds=all'
+
+# MISRA C:2023 against the baseline (reads build/compile_commands.json)
+env -u MISRA_RULE_TEXTS misch run --baseline
+misch deviations
+
+# Formatting (pinned clang-format through uvx)
+scripts/format.sh --fix
 ```
 
 #### TI C2000 cross build (library only)
@@ -93,8 +100,7 @@ The cross file is user-provided; the `c2000` job in `.github/workflows/ci.yml` w
 
 ### Formatting
 
-- `.clang-format` is present and **mandatory**. Run `clang-format -i` on all
-  modified `.c` / `.h` files before committing.
+- `.clang-format` is present and **mandatory**. Run `scripts/format.sh --fix` before committing. It runs the clang-format release pinned in the script through `uvx`.
 - Do not reformat unrelated code.
 - Key settings: 8-space indent, `BreakBeforeBraces: Linux`, column limit 80.
 
@@ -120,7 +126,7 @@ The cross file is user-provided; the `c2000` job in `.github/workflows/ci.yml` w
 - Inline trailing annotations (`/**< ... */`) on `enum`/`struct` members are allowed only when the resulting line fits the 80-column limit.
 - If any member's annotation would overrun, move **all** of that aggregate's member docs into a single structured Doxygen block above the type, as an `@details` list of `- ::SYMBOL  description` entries.
 - Never mix inline and block forms within one aggregate, and never leave a trailing comment that clang-format would wrap onto a second line.
-- After editing, verify with a `clang-format --style=file` no-reformat diff and an 80-column scan.
+- After editing, run `scripts/format.sh` and an 80-column scan.
 
 ### Testing
 
