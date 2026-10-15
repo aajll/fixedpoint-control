@@ -1,17 +1,35 @@
 # SPDX-License-Identifier: MIT
 
-project('fixedpoint-control', 'c', version: '0.3.2', default_options: ['c_std=c11', 'warning_level=3'])
-
-conf = configuration_data()
-conf.set('VERSION', meson.project_version())
-version_header = configure_file(
-  input: 'config/fpc_version.h.in',
-  output: 'fpc_version.h',
-  configuration: conf,
-  install: false,
+project(
+  'fixedpoint-control',
+  'c',
+  version: '0.3.2',
+  meson_version: '>=0.57.0',
+  default_options: ['c_std=c11', 'warning_level=3'],
 )
 
-inc = include_directories('include', '.')
+# include/fpc_status.h defines the version macros, so a copy-in build has them.
+# Configuration fails when they differ from the project version.
+
+fs = import('fs')
+version_parts = meson.project_version().split('.')
+version_macros = {
+  'FPC_VERSION_MAJOR': version_parts[0],
+  'FPC_VERSION_MINOR': version_parts[1],
+  'FPC_VERSION_PATCH': version_parts[2],
+  'FPC_VERSION': '"' + meson.project_version() + '"',
+}
+header_lines = []
+foreach line : fs.read('include' / 'fpc_status.h').split('\n')
+  header_lines += ' '.join(line.split())
+endforeach
+foreach name, value : version_macros
+  if '#define @0@ @1@'.format(name, value) not in header_lines
+    error('include/fpc_status.h must define @0@ as @1@'.format(name, value))
+  endif
+endforeach
+
+inc = include_directories('include')
 
 # Fixed-point arithmetic kernel. Its public header is part of the fpc API, so
 # fpc_dep carries it to consumers.
@@ -35,8 +53,8 @@ install_headers(
     'include/fpc_filters.h',
     'include/fpc_pid.h',
     'include/fpc_status.h',
+    'include/fpc_version.h',
   ),
-  version_header,
   subdir: 'fixedpoint-control',
 )
 

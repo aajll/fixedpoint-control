@@ -297,3 +297,25 @@ _Static_assert(sizeof(struct fpc_pid) <= 96U, "PID exceeds its RAM budget");
 ```
 
 `struct fpc_pid` is 80 bytes on x86-64 with the default format. `sizeof` counts 16-bit words on a target where `CHAR_BIT` is 16, so express the budget in the target's units. [design.md](design.md#footprint) gives every size.
+
+## Version
+
+`fpc_status.h` defines the release it belongs to, so a copied-in header still identifies itself:
+
+<!-- snippet: skip -->
+```c
+#define FPC_VERSION_MAJOR 0
+#define FPC_VERSION_MINOR 3
+#define FPC_VERSION_PATCH 2
+#define FPC_VERSION "0.3.2"
+```
+
+`FPC_VERSION_NUMBER` is `MAJOR * 10000 + MINOR * 100 + PATCH` as a `long`, so it holds any version where `int` is 16 bits. Compare it in the preprocessor to require a minimum release:
+
+```c
+#if FPC_VERSION_NUMBER < 302L
+#error "fixedpoint-control 0.3.2 or later is required"
+#endif
+```
+
+`fpc_version.h` is a deprecated header that includes `fpc_status.h`, kept so existing includes compile until the next major release.

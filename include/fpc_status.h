@@ -11,6 +11,29 @@
 #define FPC_STATUS_H_
 
 /**
+ * @name Version
+ * @brief Release of this header, for diagnostics and @c #if checks.
+ *
+ * @details
+ *    @c FPC_VERSION_NUMBER is @c MAJOR*10000 @c + @c MINOR*100
+ *    @c + @c PATCH with type @c long, so it cannot overflow where @c int is
+ *    16 bits. The Meson build fails to configure when these values differ
+ *    from the project version.
+ * @{
+ */
+/* cppcheck-suppress-begin misra-c2012-2.5 ; @deviation Public version macros
+ * for consumer diagnostics and #if checks; the library does not use them. */
+#define FPC_VERSION_MAJOR 0
+#define FPC_VERSION_MINOR 3
+#define FPC_VERSION_PATCH 2
+#define FPC_VERSION       "0.3.2"
+#define FPC_VERSION_NUMBER                                                     \
+        ((FPC_VERSION_MAJOR * 10000L) + (FPC_VERSION_MINOR * 100L)             \
+         + FPC_VERSION_PATCH)
+/* cppcheck-suppress-end misra-c2012-2.5 ; @deviation As above. */
+/** @} */
+
+/**
  * @enum fpc_status
  * @brief Common return codes for public APIs.
  *

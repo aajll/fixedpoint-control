@@ -26,7 +26,7 @@ fxp is configured with its tests and its floating-point conversion helpers disab
 
 ## Installed package
 
-`meson install` installs `libfpc.a`, the public headers and `fpc_version.h` under `include/fixedpoint-control/`, and `fixedpoint-control.pc`. When fxp was built as a subproject it installs alongside, with its headers under `include/fxp/` and `fxp.pc`.
+`meson install` installs `libfpc.a` and the public headers under `include/fixedpoint-control/`, and `fixedpoint-control.pc`. When fxp was built as a subproject it installs alongside, with its headers under `include/fxp/` and `fxp.pc`.
 
 ```sh
 meson setup build --buildtype=release
@@ -34,7 +34,7 @@ meson compile -C build
 meson install -C build --destdir staging
 ```
 
-The pkg-config file adds `include/fixedpoint-control/` to the include path and requires `fxp`, so `pkg-config --cflags --libs fixedpoint-control` gives both include directories and `-lfpc -lfxp`. A Meson consumer writes `dependency('fixedpoint-control')`. `fpc_version.h` defines `FPC_VERSION` as a string such as `"0.3.2"`; no other header includes it.
+The pkg-config file adds `include/fixedpoint-control/` to the include path and requires `fxp`, so `pkg-config --cflags --libs fixedpoint-control` gives both include directories and `-lfpc -lfxp`. A Meson consumer writes `dependency('fixedpoint-control')`. `fpc_status.h`, which both public headers include, defines the version macros described in [api.md](api.md#version). `fpc_version.h` is installed as a deprecated header that includes it.
 
 ## Number format
 

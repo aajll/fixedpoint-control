@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 
 #include "../include/fpc_filters.h"
+#include "../include/fpc_version.h"
 #include "test_harness.h"
 #include <stddef.h>
 #include <stdint.h>
@@ -303,6 +304,15 @@ TEST_CASE(test_biquad_saturates)
         TEST_ASSERT(output == FXP_MAX);
 }
 
+/* The deprecated version header still exposes the macros from fpc_status.h. */
+TEST_CASE(test_version_macros)
+{
+        TEST_ASSERT(FPC_VERSION_NUMBER
+                    == ((FPC_VERSION_MAJOR * 10000L)
+                        + (FPC_VERSION_MINOR * 100L) + FPC_VERSION_PATCH));
+        TEST_ASSERT(FPC_VERSION[0] != '\0');
+}
+
 void
 run_filters_tests(void)
 {
@@ -318,4 +328,5 @@ run_filters_tests(void)
         run_test(test_biquad_invalid_usage, "biquad_invalid_usage");
         run_test(test_biquad_zero_instance, "biquad_zero_instance");
         run_test(test_biquad_saturates, "biquad_saturates");
+        run_test(test_version_macros, "version_macros");
 }
