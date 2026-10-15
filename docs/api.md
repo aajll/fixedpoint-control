@@ -56,7 +56,7 @@ struct fpc_pid_config {
 - `dt` is the sample period, in the time unit of `ki` and `kd`. It multiplies the integral gain and divides the derivative gain; the proportional term does not use it. Choose a unit in which `dt` is exact, such as milliseconds for a 1 kHz loop, where `dt` is `FXP_INT(1)`.
 - `out_min` and `out_max` bound the output, inclusive.
 - `integral_min` and `integral_max` bound the integral term, in output units, inclusive. They apply to the wide accumulator before it is narrowed, so a reversal in error leaves the bound on the next step. Setting both to 0 disables the integral.
-- `d_filter_alpha` smooths the derivative term, from 0 to `FPC_PID_D_FILTER_ALPHA_MAX` (1.0). The maximum disables smoothing, smaller values smooth more, and 0 holds the derivative term at its current value.
+- `d_filter_alpha` smooths the derivative term, above 0 and at most `FPC_PID_D_FILTER_ALPHA_MAX` (1.0). The maximum disables smoothing and smaller values smooth more.
 
 A configuration is rejected with `FPC_STATUS_INVALID_PARAM` when `dt` is not positive, a lower bound exceeds its upper bound, `d_filter_alpha` is outside its range, or a discrete gain `ki × dt` or `kd / dt` saturates or rounds to zero from a nonzero gain. [design.md](design.md#the-control-law) gives the discrete law.
 
@@ -105,7 +105,7 @@ enum fpc_status fpc_pid_get_config(const struct fpc_pid *pid, struct fpc_pid_con
 
 `fpc_pid_set_config` applies a new configuration and keeps the runtime state. The integral, the last output and the manual output are clamped to the new bounds, and the call returns `FPC_STATUS_SATURATED` when any of them moved. A NULL or rejected `cfg` returns `FPC_STATUS_INVALID_PARAM` and leaves the controller unchanged.
 
-The integral is stored in output units, so changing `ki` or `dt` changes only how fast it grows from the next step; the output does not jump. A change to `kp` moves the output by the change in `kp` times the error. The derivative term keeps its value and moves towards the new gain at the rate `d_filter_alpha` sets. With `d_filter_alpha` 0 it never moves, so a controller retuned to 0 keeps its last derivative term as a constant offset.
+The integral is stored in output units, so changing `ki` or `dt` changes only how fast it grows from the next step; the output does not jump. A change to `kp` moves the output by the change in `kp` times the error. The derivative term keeps its value and moves towards the new gain at the rate `d_filter_alpha` sets.
 
 `fpc_pid_get_config` copies the applied configuration to `*cfg`. It returns `FPC_STATUS_NULL_PTR` for a NULL `cfg`.
 

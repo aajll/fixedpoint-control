@@ -84,7 +84,7 @@ enum fpc_pid_mode {
  *   - ::integral_min, ::integral_max  inclusive bounds on the integral term,
  *     applied to the wide accumulator (anti-windup).
  *   - ::d_filter_alpha  derivative smoothing coefficient in
- *     [0, @ref FPC_PID_D_FILTER_ALPHA_MAX]; the maximum disables smoothing.
+ *     (0, @ref FPC_PID_D_FILTER_ALPHA_MAX]; the maximum disables smoothing.
  *
  * A configuration is rejected when @c dt is not positive, a lower bound
  * exceeds its upper bound, @c d_filter_alpha is out of range, or a derived

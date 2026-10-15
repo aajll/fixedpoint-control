@@ -26,7 +26,7 @@ The controller implements the continuous law `u(t) = Kp e(t) + Ki ∫ e dt + Kd 
 - `D[k] = D[k − 1] + α (R[k] − D[k − 1])`
 - `u[k] = clamp(I[k] + Kp e[k] + D[k], out_min, out_max)`
 
-where `α` is `d_filter_alpha`.
+where `α` is `d_filter_alpha`, in (0, 1.0].
 
 ### Discrete gains
 
@@ -42,7 +42,7 @@ The unchecked wide sums cannot overflow in any fxp format. With W-bit words, fxp
 
 ### Derivative
 
-The derivative acts on the error, so a step in the setpoint, and the first step after initialisation or reset, when `e[k − 1]` is 0, produce a derivative kick. `R[k]` is narrowed and checked; `D[k]` is formed by `fxp_lerp`, a first-order low-pass that rounds once per step. With `α` at 1.0 the derivative term is the raw derivative. With `α` at 0 the term never changes: it stays 0 after initialisation, and keeps its last value after `fpc_pid_set_config` sets `α` to 0.
+The derivative acts on the error, so a step in the setpoint, and the first step after initialisation or reset, when `e[k − 1]` is 0, produce a derivative kick. `R[k]` is narrowed and checked; `D[k]` is formed by `fxp_lerp`, a first-order low-pass that rounds once per step. With `α` at 1.0 the derivative term is the raw derivative. A configuration with `α` at 0 is rejected, because the term would then never change from its value when the configuration was applied.
 
 ### Modes
 
