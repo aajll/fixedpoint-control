@@ -12,7 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
-- `fpc_status.h` defines `FPC_VERSION_MAJOR`, `_MINOR`, `_PATCH`, `FPC_VERSION` and a new `FPC_VERSION_NUMBER` (`long`, `MAJOR * 10000 + MINOR * 100 + PATCH`), so a copied-in header carries its version. `fpc_version.h` is no longer generated; it is installed as a deprecated header that includes `fpc_status.h`. Meson fails to configure when the header and `project(version:)` disagree, and the build needs Meson 0.57 or later.
+- `fpc_status.h` defines `FPC_VERSION_MAJOR`, `_MINOR`, `_PATCH`, `FPC_VERSION` and a new `FPC_VERSION_NUMBER` (`long`, `MAJOR * 10000 + MINOR * 100 + PATCH`), so a copied-in header carries its version. Meson fails to configure when the header and `project(version:)` disagree, and the build needs Meson 0.57 or later.
 - Versioning restarts in the 0.x series while the API is under active development: the 1.2.2 and 1.3.2 releases are re-published as 0.2.2 and 0.3.2 on the same commits, and minor releases may contain breaking changes until 1.0.0.
 - Added security policy, SPDX headers, cleaned ignore rules and explicit `warning_level=3`.
 - **Breaking:** PID, FIR and biquad instances are caller-owned structs (`struct fpc_pid`, `struct fpc_fir`, `struct fpc_biquad`) passed by pointer to `*_init()`, instead of pointers handed out from internal pools. FIR history is a caller-provided buffer of `order` elements.
@@ -34,6 +34,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `fpc_pid_pool_init()`, `fpc_filter_pool_init()` and the `*_deinit()` functions.
 - The `pool-allocator` dependency, `fpc_config.h`, the generated `fpc_conf.h`, and the `fpc_max_instances` and `fpc_filter_max_order` options.
 - `FPC_STATUS_POOL_FULL` and `FPC_STATUS_OVERFLOW`; the remaining status values keep their numbers.
+- `fpc_version.h`. `fpc_status.h` defines the version macros.
 
 ## [0.3.2] - 2026-05-29
 

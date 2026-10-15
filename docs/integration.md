@@ -34,7 +34,7 @@ meson compile -C build
 meson install -C build --destdir staging
 ```
 
-The pkg-config file adds `include/fixedpoint-control/` to the include path and requires `fxp`, so `pkg-config --cflags --libs fixedpoint-control` gives both include directories and `-lfpc -lfxp`. A Meson consumer writes `dependency('fixedpoint-control')`. `fpc_status.h`, which both public headers include, defines the version macros described in [api.md](api.md#version). `fpc_version.h` is installed as a deprecated header that includes it.
+The pkg-config file adds `include/fixedpoint-control/` to the include path and requires `fxp`, so `pkg-config --cflags --libs fixedpoint-control` gives both include directories and `-lfpc -lfxp`. A Meson consumer writes `dependency('fixedpoint-control')`. `fpc_status.h`, which both public headers include, defines the version macros described in [api.md](api.md#version).
 
 ## Number format
 
