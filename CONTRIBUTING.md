@@ -4,9 +4,15 @@ fixedpoint-control is a fixed-point PID and filter library built on the `fxp` ar
 
 ## Getting started
 
-The same commands CI runs, locally:
+Install the Python tools with [uv](https://docs.astral.sh/uv/), as CI does. The MISRA analysis also needs a current `cppcheck`. The same commands CI runs, locally:
 
 ```sh
+# Python tools
+uv tool install meson
+uv tool install ninja
+uv tool install gcovr
+uv tool install misch
+
 # Configure with tests + sanitisers (CI default)
 meson setup build --buildtype=debug -Dbuild_tests=true \
                   -Db_sanitize=address,undefined
@@ -27,7 +33,7 @@ meson compile -C build_c2000
 
 ## Source style
 
-- `.clang-format` is mandatory. Run `clang-format -i` on every modified `.c` / `.h` file before submitting.
+- Formatting is mandatory. Run `scripts/format.sh --fix` before submitting, or `scripts/format.sh` to check without writing, as CI does. The script pins the clang-format release and runs it through `uvx`.
 - 8-space indent, Linux brace style, 80-column limit. Match the existing conventions; do not reformat unrelated code.
 - The Meson build system is the single source of truth. Update `src/meson.build` or `tests/meson.build` when adding or removing source files.
 - Do not introduce CMake, Make, or other build systems.
@@ -47,7 +53,7 @@ meson compile -C build_c2000
 
 ## Static Analysis
 
-Contributors are encouraged to follow MISRA C:2023 guidelines to maintain the library's auditable nature. New deviations introduced in a PR should be called out in the description with a justification.
+The library is analysed for MISRA C:2023 with `misch`, configured by `misra.toml`. CI fails on any finding that is not in `analysis/baseline/misra-baseline.json`; run it from a configured `build/` directory with `MISRA_RULE_TEXTS` unset, as CI does. Do not regenerate the baseline to admit a new finding. New deviations introduced in a PR should be called out in the description with a justification.
 
 - Avoid pointer arithmetic where possible.
 - Ensure all loops have deterministic, compile-time or strictly bounded limits.
@@ -78,6 +84,13 @@ meson test -C build_mem --verbose \
 # Warnings-as-errors
 meson setup build_warn --buildtype=debug -Dbuild_tests=true -Dwerror=true
 meson compile -C build_warn
+
+# MISRA C:2023 against the baseline (reads build/compile_commands.json)
+env -u MISRA_RULE_TEXTS misch run --baseline
+misch deviations
+
+# Formatting (pinned clang-format through uvx)
+scripts/format.sh --fix
 ```
 
 `cppcheck` and `valgrind memcheck` findings must either be fixed or silenced with a justified inline `/* cppcheck-suppress <id> */` marker.

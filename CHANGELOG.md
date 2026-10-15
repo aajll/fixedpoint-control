@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - FIR and biquad outputs narrow through fxp's build-wide rounding policy (round-to-nearest-even by default) instead of an arithmetic right shift, which rounded towards negative infinity. Expected values move by one LSB where the floor lost a fraction: the three-tap moving average of 1000, 2000, 2000 gives 333, 1000, 1667 (previously 333, 999, 1666; exact values 333.328, 999.985, 1666.641), and the same filter fed 900 after a reset gives 300 (previously 299; exact value 299.995).
 - The coverage gate is 100% of lines and branches.
 - CI cross-compiles the library and fxp with TI C2000 CGT 22.6.2 and 25.11.1 under COFF and EABI, with warnings as errors.
+- CI installs its Python tools with uv, checks formatting with the clang-format release pinned in `scripts/format.sh`, and runs a MISRA C:2023 analysis with misch against a recorded baseline. The Meson files and tests carry SPDX headers.
 
 ### Fixed
 

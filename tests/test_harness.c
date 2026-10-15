@@ -1,4 +1,6 @@
 /*
+ * SPDX-License-Identifier: MIT
+ *
  * @file: test_harness.c
  * @brief Test runner implementation.
  */

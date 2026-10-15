@@ -1,4 +1,6 @@
 /*
+ * SPDX-License-Identifier: MIT
+ *
  * @file: test_harness.h
  * @brief Minimal test harness used by the fixedpoint-control unit-test suite.
  */
