@@ -56,7 +56,7 @@ Coverage commands are in `CONTRIBUTING.md`.
 
 ### 1.2 Notes
 
-- `meson setup` generates `fpc_version.h` into the build directory; no header includes it. The build installs `libfpc.a`, headers under `fixedpoint-control/`, and `fixedpoint-control.pc`. The only Meson option is `build_tests`, default `false`.
+- `include/fpc_status.h` defines the version macros, and `meson setup` fails when they differ from `project(version:)`, so a release updates both. `include/fpc_version.h` is a deprecated header that includes `fpc_status.h`. The build installs `libfpc.a`, headers under `fixedpoint-control/`, and `fixedpoint-control.pc`. The only Meson option is `build_tests`, default `false`.
 - fxp is fetched on the first configure, pinned by commit in `subprojects/fxp.wrap`, and built with its tests and conversion helpers disabled. Its `fxp.h` is part of this library's API.
 - The `fixedpoint-control docs examples` test needs fxp's headers in `subprojects/fxp/`, so it is registered only when fxp is a subproject.
 

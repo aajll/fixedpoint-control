@@ -112,7 +112,7 @@ A PID controller is initialised once its stored `dt` is positive, and a FIR filt
 
 ## MISRA C:2023
 
-The library is analysed with [`misch`](https://pypi.org/project/misch/), a cppcheck-based MISRA C:2023 checker, over `src/` and `include/`. fxp is outside the scope, but its macros expand into the analysed code. The baseline of accepted findings is `analysis/baseline/misra-baseline.json`, and CI fails on any finding outside it.
+The library is analysed with [`misch`](https://pypi.org/project/misch/), a cppcheck-based MISRA C:2023 checker, over `src/` and `include/`. fxp is outside the scope, but its macros expand into the analysed code. The baseline of accepted findings is `analysis/baseline/misra-baseline.json`, and CI fails on any finding outside it. The version macros in `fpc_status.h` carry an inline deviation of Rule 2.5 (unused macro), because they exist for consumers and the library does not use them.
 
 | Rule | Findings | Cause |
 | --- | --- | --- |
