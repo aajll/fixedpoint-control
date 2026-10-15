@@ -131,9 +131,9 @@ enum fpc_pid_mode {
 enum fpc_status fpc_pid_set_mode(struct fpc_pid *pid, enum fpc_pid_mode mode, fxp_t manual_output);
 ```
 
-Switching to manual mode holds `manual_output`, clamped to the output bounds, and returns `FPC_STATUS_SATURATED` if it was clamped. A second call in manual mode replaces the held output. While in manual mode, `fpc_pid_compute` returns the held output and tracks the error, and the derivative term stays 0.
+Switching to manual mode holds `manual_output`, clamped to the output bounds, clears the derivative term and returns `FPC_STATUS_SATURATED` if the output was clamped. A second call in manual mode replaces the held output. While in manual mode, `fpc_pid_compute` returns the held output and tracks the error, and the derivative term stays 0.
 
-Switching back to auto mode sets the integral to `u − kp × e − D`, clamped to the integral bounds, where `u` is the held output, `e` the last error and `D` the derivative term. The next `fpc_pid_compute` then adds its own integral step before forming the output, so for an unchanged error it returns `u + ki × dt × e` rather than `u`. With `kp` 1, `ki` 0.5, `dt` 1, a held output of 300 and an error of 100, the first auto output is 350. The call returns `FPC_STATUS_SATURATED` if the integral was clamped. Switching to auto mode while in auto mode does nothing, and `manual_output` is then ignored.
+Switching back to auto mode sets the integral to `u − kp × e − ki × dt × e`, clamped to the integral bounds, where `u` is the held output and `e` the last error. The next `fpc_pid_compute` adds the integral step `ki × dt × e`, so for an unchanged error it returns `u`. With `kp` 1, `ki` 0.5, `dt` 1, a held output of 300 and an error of 100, the integral becomes 150 and the first auto output is 300. The call returns `FPC_STATUS_SATURATED` if the integral was clamped, and the first auto output then differs from `u`. Switching to auto mode while in auto mode does nothing, and `manual_output` is then ignored.
 
 A `mode` other than the two enumerators returns `FPC_STATUS_INVALID_PARAM`.
 

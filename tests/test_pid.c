@@ -403,6 +403,88 @@ TEST_CASE(test_manual_mode_and_bumpless_return)
         TEST_ASSERT(state.integral == 200);
 }
 
+TEST_CASE(test_bumpless_return_with_integral)
+{
+        struct fpc_pid pid;
+        struct fpc_pid_config cfg = wide_config();
+        struct fpc_pid_state state;
+        fxp_t output = 0;
+
+        cfg.kd = 0;
+
+        /* I = 300 - 100 - 50, so the step that adds 50 returns 300. */
+        TEST_ASSERT(fpc_pid_init(&pid, &cfg) == FPC_STATUS_OK);
+        TEST_ASSERT(fpc_pid_set_mode(&pid, FPC_PID_MODE_MANUAL, 300)
+                    == FPC_STATUS_OK);
+        TEST_ASSERT(fpc_pid_compute(&pid, 1000, 900, &output) == FPC_STATUS_OK);
+        TEST_ASSERT(fpc_pid_set_mode(&pid, FPC_PID_MODE_AUTO, 0)
+                    == FPC_STATUS_OK);
+        TEST_ASSERT(fpc_pid_get_state(&pid, &state) == FPC_STATUS_OK);
+        TEST_ASSERT(state.integral == 150);
+        TEST_ASSERT(fpc_pid_compute(&pid, 1000, 900, &output) == FPC_STATUS_OK);
+        TEST_ASSERT(output == 300);
+
+        /* A negative error. */
+        TEST_ASSERT(fpc_pid_set_mode(&pid, FPC_PID_MODE_MANUAL, 300)
+                    == FPC_STATUS_OK);
+        TEST_ASSERT(fpc_pid_compute(&pid, 900, 1000, &output) == FPC_STATUS_OK);
+        TEST_ASSERT(fpc_pid_set_mode(&pid, FPC_PID_MODE_AUTO, 0)
+                    == FPC_STATUS_OK);
+        TEST_ASSERT(fpc_pid_compute(&pid, 900, 1000, &output) == FPC_STATUS_OK);
+        TEST_ASSERT(output == 300);
+}
+
+TEST_CASE(test_bumpless_return_without_manual_step)
+{
+        struct fpc_pid pid;
+        struct fpc_pid_config cfg = term_config(0, 0, FXP_ONE, FXP_ONE);
+        struct fpc_pid_state state;
+        fxp_t output = 0;
+
+        /* Errors 10 and 30 leave D = 20; entering manual mode clears it. */
+        TEST_ASSERT(fpc_pid_init(&pid, &cfg) == FPC_STATUS_OK);
+        TEST_ASSERT(fpc_pid_compute(&pid, 10, 0, &output) == FPC_STATUS_OK);
+        TEST_ASSERT(fpc_pid_compute(&pid, 30, 0, &output) == FPC_STATUS_OK);
+        TEST_ASSERT(output == 20);
+        TEST_ASSERT(fpc_pid_set_mode(&pid, FPC_PID_MODE_MANUAL, 50)
+                    == FPC_STATUS_OK);
+        TEST_ASSERT(fpc_pid_get_state(&pid, &state) == FPC_STATUS_OK);
+        TEST_ASSERT(state.filtered_derivative == 0);
+        TEST_ASSERT(fpc_pid_set_mode(&pid, FPC_PID_MODE_AUTO, 0)
+                    == FPC_STATUS_OK);
+        TEST_ASSERT(fpc_pid_compute(&pid, 30, 0, &output) == FPC_STATUS_OK);
+        TEST_ASSERT(output == 50);
+}
+
+TEST_CASE(test_bumpless_rebias_saturates)
+{
+        struct fpc_pid pid;
+        struct fpc_pid_config cfg = term_config(FXP_MAX, FXP_MAX, 0, FXP_ONE);
+        struct fpc_pid_state state;
+        fxp_t output = 0;
+
+        /* u - Kp e - (Ki dt) e is beyond the accumulator for full-scale
+         * gains and errors; the bias saturates to the integral bounds. */
+        TEST_ASSERT(fpc_pid_init(&pid, &cfg) == FPC_STATUS_OK);
+        TEST_ASSERT(fpc_pid_set_mode(&pid, FPC_PID_MODE_MANUAL, FXP_MIN)
+                    == FPC_STATUS_OK);
+        TEST_ASSERT(fpc_pid_compute(&pid, FXP_MAX, 0, &output)
+                    == FPC_STATUS_OK);
+        TEST_ASSERT(fpc_pid_set_mode(&pid, FPC_PID_MODE_AUTO, 0)
+                    == FPC_STATUS_SATURATED);
+        TEST_ASSERT(fpc_pid_get_state(&pid, &state) == FPC_STATUS_OK);
+        TEST_ASSERT(state.integral == FXP_MIN);
+
+        TEST_ASSERT(fpc_pid_set_mode(&pid, FPC_PID_MODE_MANUAL, FXP_MAX)
+                    == FPC_STATUS_OK);
+        TEST_ASSERT(fpc_pid_compute(&pid, FXP_MIN, 0, &output)
+                    == FPC_STATUS_OK);
+        TEST_ASSERT(fpc_pid_set_mode(&pid, FPC_PID_MODE_AUTO, 0)
+                    == FPC_STATUS_SATURATED);
+        TEST_ASSERT(fpc_pid_get_state(&pid, &state) == FPC_STATUS_OK);
+        TEST_ASSERT(state.integral == FXP_MAX);
+}
+
 TEST_CASE(test_bumpless_rebias_clamps)
 {
         struct fpc_pid pid;
@@ -493,6 +575,11 @@ run_pid_tests(void)
         run_test(test_set_config_clamps_state, "set_config_clamps_state");
         run_test(test_manual_mode_and_bumpless_return,
                  "manual_mode_and_bumpless_return");
+        run_test(test_bumpless_return_with_integral,
+                 "bumpless_return_with_integral");
+        run_test(test_bumpless_return_without_manual_step,
+                 "bumpless_return_without_manual_step");
+        run_test(test_bumpless_rebias_saturates, "bumpless_rebias_saturates");
         run_test(test_bumpless_rebias_clamps, "bumpless_rebias_clamps");
         run_test(test_manual_mode_clamps_output, "manual_mode_clamps_output");
         run_test(test_null_and_invalid_runtime_calls,

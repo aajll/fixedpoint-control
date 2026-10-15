@@ -180,9 +180,10 @@ enum fpc_status fpc_pid_get_config(const struct fpc_pid *pid,
 /**
  * @brief Switch between auto and manual mode.
  *
- * Entering manual mode holds @p manual_output, clamped to the output bounds.
- * Returning to auto mode re-biases the integral so that the next output, for
- * an unchanged error, equals the last output (bumpless transfer).
+ * Entering manual mode holds @p manual_output, clamped to the output bounds,
+ * and clears the derivative term. Returning to auto mode re-biases the integral
+ * so that the next output, for an unchanged error, equals the last output
+ * (bumpless transfer).
  *
  * @param pid Controller instance.
  * @param mode Requested mode.
