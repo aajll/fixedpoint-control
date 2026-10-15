@@ -38,7 +38,7 @@ The integral is held in `fxp_acc_t` and never rounded, so a contribution below o
 
 The integral bounds clamp the wide accumulator itself, before narrowing. Once the error reverses, the integral leaves the bound on the next step, with no stored excess to unwind. The output bounds are separate; an integral that is not bounded tighter than the output can still wind up to its own bounds while the output is saturated.
 
-The unchecked wide sums cannot overflow in any fxp format. With W-bit words, fxp guarantees `FXP_FRAC_BITS ≤ W − 2`, so the integral and the widened derivative are each at most 2^(2W−3) in magnitude, and a product of two `fxp_t` at most 2^(2W−2). A sum of two such terms and one product stays within the 2W-bit accumulator, so `I + Kp e + D`, the integral step and the mode-switch bias are each formed without a check and narrowed once.
+The unchecked wide sums cannot overflow in any fxp format. With W-bit words, fxp guarantees `FXP_FRAC_BITS ≤ W − 2`, so the integral and the widened derivative are each at most 2^(2W−3) in magnitude, and a product of two `fxp_t` at most 2^(2W−2). A sum of two such terms and one product stays within the 2W-bit accumulator, so `I + Kp e + D` and the integral step are each formed without a check and narrowed once. The mode-switch bias subtracts two products from a widened output, which can leave the accumulator range, so its second subtraction saturates; the saturated value is beyond the integral bounds and clamps to them.
 
 ### Derivative
 
@@ -46,9 +46,9 @@ The derivative acts on the error, so a step in the setpoint, and the first step 
 
 ### Modes
 
-Manual mode holds an output, clamped to the output bounds. Each step in manual mode records the error and sets `D` to 0, so the derivative restarts from the tracked error.
+Manual mode holds an output, clamped to the output bounds. Entering manual mode, and each step in it, sets `D` to 0, and each step records the error, so the derivative restarts from the tracked error.
 
-Returning to auto mode sets `I = u − Kp e[k − 1] − D`, clamped to the integral bounds, where `u` is the held output. The bias omits the integral step that the next `fpc_pid_compute` adds before forming its output, so for an unchanged error the first auto output is `u + (Ki dt) e` rather than `u`. When `Ki` is 0 the transfer is exact.
+Returning to auto mode sets `I = u − Kp e[k − 1] − (Ki dt) e[k − 1]`, clamped to the integral bounds, where `u` is the held output. The next `fpc_pid_compute` adds the integral step `(Ki dt) e[k]` and, for `e[k] = e[k − 1]`, a derivative term of 0, so its output is `u`. The transfer is exact unless the bias was clamped.
 
 ## FIR filter
 
@@ -129,9 +129,7 @@ The tests run on the host:
 
 | Test | What it checks |
 | --- | --- |
-| `fixedpoint-control unit tests` | 15 PID cases: configuration checks, the effect of `dt` on each term, sub-LSB integration, anti-windup on the accumulator, saturation reporting at the extremes, derivative smoothing, state readback, reset, retuning, manual mode and the return to auto. 11 filter cases: FIR sums, tap order, rounding of negative values, reset and reconfiguration, saturation and invalid use, and the biquad difference equation, a zeroed instance, saturation and invalid use. |
+| `fixedpoint-control unit tests` | 18 PID cases: configuration checks, the effect of `dt` on each term, sub-LSB integration, anti-windup on the accumulator, saturation reporting at the extremes, derivative smoothing, state readback, reset, retuning, manual mode and the return to auto, with and without an integral term. 11 filter cases: FIR sums, tap order, rounding of negative values, reset and reconfiguration, saturation and invalid use, and the biquad difference equation, a zeroed instance, saturation and invalid use. |
 | `fixedpoint-control docs examples` | Every C block in the README, `CONTRIBUTING.md` and `docs/` compiles against the headers. |
-
-The bumpless-transfer test uses `Ki` 0, where the transfer is exact.
 
 CI runs the unit tests under AddressSanitizer and UndefinedBehaviorSanitizer and again under Valgrind, builds with warnings as errors and in release mode, gates line and branch coverage of `src/` and `include/` at 100 percent, runs cppcheck with its warning, style, performance and portability checks, checks formatting, and runs the MISRA analysis. It also compiles the library and fxp with warnings as errors under TI C2000 CGT 22.6.2 and 25.11.1, in both the COFF and EABI formats.

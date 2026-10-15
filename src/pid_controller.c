@@ -14,7 +14,9 @@
  * words, fxp guarantees FXP_FRAC_BITS <= W - 2, so the integral accumulator
  * and the widened derivative (an fxp_t times FXP_ONE) are each at most
  * 2^(2W-3) in magnitude and any product of two fxp_t is at most 2^(2W-2).
- * Every sum of two such terms and one product stays below 2^(2W-1).
+ * Every sum of two such terms and one product stays below 2^(2W-1). The
+ * mode-switch bias subtracts a second product, which can exceed that range,
+ * so that step saturates.
  *
  * @note Public API functions are documented in the header; internal helpers are
  *       marked @internal.
@@ -24,6 +26,23 @@
 #include <stddef.h>
 
 /* ================ INTERNAL HELPERS ===================================== */
+
+/** @internal acc - a * b, saturated to the accumulator range. */
+static fxp_acc_t
+fpc_pid_msub_sat(fxp_acc_t acc, fxp_t a, fxp_t b)
+{
+        const fxp_acc_t prod = (fxp_acc_t)a * (fxp_acc_t)b;
+        fxp_acc_t result;
+
+        if ((prod < 0) && (acc > (FXP_WIDE_MAX + prod))) {
+                result = FXP_WIDE_MAX;
+        } else if ((prod > 0) && (acc < (FXP_WIDE_MIN + prod))) {
+                result = FXP_WIDE_MIN;
+        } else {
+                result = acc - prod;
+        }
+        return result;
+}
 
 /** @internal Widen an fxp_t to the accumulator scale. */
 static fxp_acc_t
@@ -219,12 +238,14 @@ fpc_pid_set_mode(struct fpc_pid *pid, enum fpc_pid_mode mode,
                     fpc_pid_clamp(manual_output, pid->cfg.out_min,
                                   pid->cfg.out_max, &clamped);
                 pid->last_output = pid->manual_output;
+                pid->filtered_derivative = 0;
         } else if ((enum fpc_pid_mode)pid->mode == FPC_PID_MODE_MANUAL) {
-                /* I = u - Kp e - D, so the next output repeats u. */
-                const fxp_acc_t rebias =
+                /* D is 0 in manual mode. I = u - Kp e - (Ki dt) e, so the
+                 * next step, which adds (Ki dt) e, repeats u. */
+                const fxp_acc_t rebias = fpc_pid_msub_sat(
                     fpc_pid_widen(pid->last_output)
-                    - ((fxp_acc_t)pid->cfg.kp * (fxp_acc_t)pid->prev_error)
-                    - fpc_pid_widen(pid->filtered_derivative);
+                        - ((fxp_acc_t)pid->cfg.kp * (fxp_acc_t)pid->prev_error),
+                    pid->ki_dt, pid->prev_error);
                 pid->integral =
                     fpc_pid_clamp_acc(rebias, pid->cfg.integral_min,
                                       pid->cfg.integral_max, &clamped);
