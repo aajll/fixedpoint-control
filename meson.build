@@ -53,7 +53,6 @@ install_headers(
     'include/fpc_filters.h',
     'include/fpc_pid.h',
     'include/fpc_status.h',
-    'include/fpc_version.h',
   ),
   subdir: 'fixedpoint-control',
 )

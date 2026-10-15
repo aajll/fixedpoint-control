@@ -317,5 +317,3 @@ _Static_assert(sizeof(struct fpc_pid) <= 96U, "PID exceeds its RAM budget");
 #error "fixedpoint-control 0.3.2 or later is required"
 #endif
 ```
-
-`fpc_version.h` is a deprecated header that includes `fpc_status.h`, kept so existing includes compile until the next major release.
