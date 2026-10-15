@@ -82,7 +82,7 @@ fpc_pid_derive(const struct fpc_pid_config *cfg, fxp_t *ki_dt, fxp_t *kd_dt)
 
         if ((cfg == NULL) || (cfg->dt <= 0) || (cfg->out_min > cfg->out_max)
             || (cfg->integral_min > cfg->integral_max)
-            || (cfg->d_filter_alpha < 0)
+            || (cfg->d_filter_alpha <= 0)
             || (cfg->d_filter_alpha > FPC_PID_D_FILTER_ALPHA_MAX)) {
                 return false;
         }

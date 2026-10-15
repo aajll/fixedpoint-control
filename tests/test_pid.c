@@ -109,6 +109,10 @@ TEST_CASE(test_invalid_config_rejected)
         TEST_ASSERT(fpc_pid_init(&pid, &cfg) == FPC_STATUS_INVALID_PARAM);
         cfg.d_filter_alpha = -1;
         TEST_ASSERT(fpc_pid_init(&pid, &cfg) == FPC_STATUS_INVALID_PARAM);
+        cfg.d_filter_alpha = 0;
+        TEST_ASSERT(fpc_pid_init(&pid, &cfg) == FPC_STATUS_INVALID_PARAM);
+        cfg.d_filter_alpha = FXP_RAW(1);
+        TEST_ASSERT(fpc_pid_init(&pid, &cfg) == FPC_STATUS_OK);
 
         /* ki * dt saturates. */
         cfg = term_config(0, FXP_MAX, 0, FXP_INT(2));
@@ -325,6 +329,7 @@ TEST_CASE(test_set_config_clamps_state)
         struct fpc_pid_config cfg = test_config();
         struct fpc_pid_config tighter_cfg = test_config();
         struct fpc_pid_config bad_cfg = test_config();
+        struct fpc_pid_config alpha_zero_cfg = test_config();
         struct fpc_pid_state state;
         fxp_t output = 0;
 
@@ -333,11 +338,14 @@ TEST_CASE(test_set_config_clamps_state)
         tighter_cfg.integral_min = -5;
         tighter_cfg.integral_max = 5;
         bad_cfg.dt = 0;
+        alpha_zero_cfg.d_filter_alpha = 0;
 
         TEST_ASSERT(fpc_pid_init(&pid, &cfg) == FPC_STATUS_OK);
         TEST_ASSERT(fpc_pid_compute(&pid, 1000, 0, &output)
                     == FPC_STATUS_SATURATED);
         TEST_ASSERT(fpc_pid_set_config(&pid, &bad_cfg)
+                    == FPC_STATUS_INVALID_PARAM);
+        TEST_ASSERT(fpc_pid_set_config(&pid, &alpha_zero_cfg)
                     == FPC_STATUS_INVALID_PARAM);
         TEST_ASSERT(fpc_pid_set_config(&pid, NULL) == FPC_STATUS_INVALID_PARAM);
         TEST_ASSERT(fpc_pid_get_state(&pid, &state) == FPC_STATUS_OK);

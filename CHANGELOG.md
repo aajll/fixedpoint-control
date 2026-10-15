@@ -28,6 +28,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - The PID integral accumulates in a wide `fxp_acc_t` and narrows once per output, so contributions below one LSB per step add up instead of truncating to zero; anti-windup clamps that accumulator.
 - FIR and biquad sums saturate and return `FPC_STATUS_SATURATED` on overflow, including with `INT32_MIN` coefficients and samples, instead of overflowing a signed integer.
 - No arithmetic path right-shifts a negative value.
+- A PID configuration with `d_filter_alpha` 0 is rejected with `FPC_STATUS_INVALID_PARAM`. Such a configuration held the derivative term at its value when it was applied, so after `fpc_pid_set_config` it stayed as a constant output offset.
 
 ### Removed
 
