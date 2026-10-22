@@ -305,15 +305,15 @@ _Static_assert(sizeof(struct fpc_pid) <= 96U, "PID exceeds its RAM budget");
 <!-- snippet: skip -->
 ```c
 #define FPC_VERSION_MAJOR 0
-#define FPC_VERSION_MINOR 3
-#define FPC_VERSION_PATCH 2
-#define FPC_VERSION "0.3.2"
+#define FPC_VERSION_MINOR 4
+#define FPC_VERSION_PATCH 0
+#define FPC_VERSION "0.4.0"
 ```
 
 `FPC_VERSION_NUMBER` is `MAJOR * 10000 + MINOR * 100 + PATCH` as a `long`, so it holds any version where `int` is 16 bits. Compare it in the preprocessor to require a minimum release:
 
 ```c
-#if FPC_VERSION_NUMBER < 302L
-#error "fixedpoint-control 0.3.2 or later is required"
+#if FPC_VERSION_NUMBER < 400L
+#error "fixedpoint-control 0.4.0 or later is required"
 #endif
 ```

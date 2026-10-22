@@ -24,9 +24,9 @@
 /* cppcheck-suppress-begin misra-c2012-2.5 ; @deviation Public version macros
  * for consumer diagnostics and #if checks; the library does not use them. */
 #define FPC_VERSION_MAJOR 0
-#define FPC_VERSION_MINOR 3
-#define FPC_VERSION_PATCH 2
-#define FPC_VERSION       "0.3.2"
+#define FPC_VERSION_MINOR 4
+#define FPC_VERSION_PATCH 0
+#define FPC_VERSION       "0.4.0"
 #define FPC_VERSION_NUMBER                                                     \
         ((FPC_VERSION_MAJOR * 10000L) + (FPC_VERSION_MINOR * 100L)             \
          + FPC_VERSION_PATCH)
